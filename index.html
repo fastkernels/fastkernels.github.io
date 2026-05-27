@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Primary Meta Tags -->
+  <title>FastKernels: Benchmarking GPU Kernel Generation in Production</title>
+  <meta name="title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
+  <meta name="description" content="FastKernels is a production-grade benchmark and inference framework for GPU kernel generation. 46 architectures across 8 categories subsume 96.2% (409/425) of HuggingFace Transformers architectures.">
+  <meta name="keywords" content="FastKernels, GPU kernels, CUDA, Triton, kernel generation, LLM agents, inference, vLLM, SGLang, benchmark, KernelBench, kb_nano, MoE, FlashAttention, FlashInfer">
+  <meta name="author" content="Gabriele Oliaro, Yichao Fu, May Jiang, Owen Lu, Junli Wang, Zhihao Jia, Hao Zhang, Samyam Rajbhandari">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://fastkernels.github.io/">
+  <meta property="og:title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
+  <meta property="og:description" content="A production-grade benchmark and inference framework for GPU kernel generation, covering 46 architectures across 8 categories.">
+  <meta property="og:image" content="https://fastkernels.github.io/images/overview.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://fastkernels.github.io/">
+  <meta property="twitter:title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
+  <meta property="twitter:description" content="A production-grade benchmark and inference framework for GPU kernel generation.">
+  <meta property="twitter:image" content="https://fastkernels.github.io/images/overview.png">
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://fastkernels.github.io/">
+
+  <!-- Additional SEO -->
+  <meta name="citation_title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
+  <meta name="citation_author" content="Oliaro, Gabriele">
+  <meta name="citation_author" content="Fu, Yichao">
+  <meta name="citation_author" content="Jiang, May">
+  <meta name="citation_author" content="Lu, Owen">
+  <meta name="citation_author" content="Wang, Junli">
+  <meta name="citation_author" content="Jia, Zhihao">
+  <meta name="citation_author" content="Zhang, Hao">
+  <meta name="citation_author" content="Rajbhandari, Samyam">
+  <meta name="citation_publication_date" content="2026">
+  <meta name="citation_arxiv_id" content="arXiv:2605.23215">
+  <meta name="citation_pdf_url" content="https://arxiv.org/pdf/2605.23215.pdf">
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro|Lato:wght@300;400;700;900"
+        rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Texta:wght@400;700;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <link rel="icon" type="image/png" href="./images/fastkernels-logo.png">
+  <style>
+    :root {
+      /* Light mode colors */
+      --bg-primary: #ffffff;
+      --bg-secondary: #f8f9fa;
+      --text-primary: #333333;
+      --text-secondary: #666666;
+      --text-muted: #888888;
+      --border-color: #e1e5e9;
+      --shadow: rgba(0, 0, 0, 0.1);
+      --accent-color: #11567F;
+      --accent-hover: #29B5E8;
+    }
+
+    [data-theme="dark"] {
+      /* Dark mode colors */
+      --bg-primary: #1a1a1a;
+      --bg-secondary: #2d2d2d;
+      --text-primary: #ffffff;
+      --text-secondary: #cccccc;
+      --text-muted: #999999;
+      --border-color: #404040;
+      --shadow: rgba(0, 0, 0, 0.3);
+      --accent-color: #29B5E8;
+      --accent-hover: #11567F;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+
+    .hero {
+      background-color: var(--bg-primary);
+    }
+
+    .section {
+      background-color: var(--bg-primary);
+    }
+
+    .footer {
+      background-color: var(--bg-secondary);
+    }
+
+    details {
+      background-color: var(--bg-secondary);
+      border-color: var(--border-color);
+    }
+
+    details > summary {
+      list-style: none;
+      color: var(--text-primary);
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    /* Snowflake Brand Fonts */
+    .publication-title {
+      font-family: 'Texta', 'Google Sans', sans-serif !important;
+      font-weight: 900 !important;
+      color: var(--accent-color) !important;
+    }
+
+    .publication-authors {
+      font-family: 'Lato', 'Noto Sans', sans-serif !important;
+      font-weight: 400 !important;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Texta', 'Google Sans', sans-serif !important;
+      color: var(--accent-color) !important;
+    }
+
+    /* Target Bulma title classes specifically */
+    .title {
+      color: var(--accent-color) !important;
+    }
+
+    .title.is-1, .title.is-2, .title.is-3, .title.is-4, .title.is-5, .title.is-6 {
+      color: var(--accent-color) !important;
+    }
+
+    body, p, div, span {
+      font-family: 'Lato', 'Noto Sans', sans-serif !important;
+    }
+
+    .content {
+      color: var(--text-primary);
+    }
+
+    /* Snowflake Brand Button Styling */
+    .external-link.button {
+      background-color: var(--accent-color) !important;
+      border-color: var(--accent-color) !important;
+      color: white !important;
+      font-family: 'Texta', 'Google Sans', sans-serif !important;
+      font-weight: 900 !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.5px !important;
+      border-radius: 80px !important;
+      padding: 12px 27px !important;
+      height: 34px !important;
+      transition: all 0.3s ease !important;
+    }
+
+    .external-link.button:hover {
+      background-color: var(--accent-hover) !important;
+      border-color: var(--accent-hover) !important;
+      transform: translateY(-1px) !important;
+      box-shadow: 0 4px 8px var(--shadow) !important;
+    }
+
+    /* Theme toggle button */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      cursor: pointer;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      z-index: 1000;
+      box-shadow: 0 2px 10px var(--shadow);
+    }
+
+    .theme-toggle:hover {
+      background: var(--accent-hover);
+      transform: scale(1.1);
+    }
+
+    /* Update author link colors */
+    .publication-authors a {
+      color: var(--accent-color) !important;
+    }
+
+    /* Update muted text */
+    .is-size-4 span {
+      color: var(--text-muted) !important;
+    }
+
+    /* Highlight stat cards */
+    .stat-card {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem 1rem;
+      text-align: center;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 16px var(--shadow);
+    }
+
+    .stat-number {
+      font-family: 'Texta', 'Google Sans', sans-serif !important;
+      font-weight: 900 !important;
+      font-size: 2.2rem;
+      color: var(--accent-color);
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      margin-top: 0.4rem;
+    }
+  </style>
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+</head>
+<body>
+  <!-- Theme Toggle Button -->
+  <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
+    <i class="fas fa-moon" id="theme-icon"></i>
+  </button>
+
+<section class="hero" style="margin-bottom: 0px;">
+  <div class="hero-body">
+    <div class="container is-max-widescreen">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px; gap: 20px; flex-wrap: wrap;">
+            <img src="./images/fastkernels-logo.png" alt="FastKernels Logo" style="max-height: 120px; width: auto;">
+            <h1 class="title is-2 publication-title" style="margin: 0;">FastKernels: Benchmarking GPU Kernel<br>Generation in Production</h1>
+          </div>
+          <div class="is-size-5 publication-authors" style="margin-top: 1.2rem;">
+            <span class="author-block">
+              <a href="https://www.gabrieleoliaro.com/">Gabriele Oliaro</a><sup>1,2</sup><sup>*</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              <a href="https://ychfu.com/">Yichao Fu</a><sup>3</sup><sup>*</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              May Jiang<sup>4</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              Owen Lu<sup>2</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              Junli Wang<sup>3</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              <a href="https://cseweb.ucsd.edu/~haozhang/">Hao Zhang</a><sup>3</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              <a href="https://www.cs.cmu.edu/~zhihaoj2/">Zhihao Jia</a><sup>2</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              Samyam Rajbhandari<sup>1</sup>
+            </span>
+          </div>
+
+          <div class="is-size-6 publication-authors" style="margin-top: 0.4rem;">
+            <span class="author-block"><sup>1</sup>Snowflake AI Research</span>
+            <span class="author-block" style="padding-left:18px"><sup>2</sup>Carnegie Mellon University</span>
+            <span class="author-block" style="padding-left:18px"><sup>3</sup>UC San Diego</span>
+            <span class="author-block" style="padding-left:18px"><sup>4</sup>Independent Researcher</span>
+          </div>
+
+          <div class="is-size-7" style="margin-top: 0.3rem; color: var(--text-muted);">
+            <sup>*</sup>Equal contribution
+          </div>
+
+          <div class="column has-text-centered" style="margin-top: 1.2rem;">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2605.23215"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://arxiv.org/abs/2605.23215"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="ai ai-arxiv"></i>
+                  </span>
+                  <span>arXiv</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://github.com/sfc-gh-goliaro/kb_nano"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-github"></i>
+                  </span>
+                  <span>Code</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="https://snowflake-84d72a0d.mintlify.app/intro"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-book"></i>
+                  </span>
+                  <span>Docs</span>
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <center><img src="./images/overview.png" alt="FastKernels Overview" width="100%"></center>
+      <div class="content has-text-justified" style="margin-top: 1rem;">
+        <b>FastKernels overview.</b> Three benchmark–production misalignments (left) motivate three design pillars (center),
+        which converge into a unified benchmark-as-framework design (right). Optimized kernels flow through a virtuous cycle (bottom):
+        optimization, validation, integration as new baselines, and release.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Headline Stats -->
+<section class="section" style="padding-top: 0;">
+  <div class="container is-max-desktop">
+    <div class="columns is-multiline is-mobile">
+      <div class="column is-3-tablet is-6-mobile">
+        <div class="stat-card">
+          <div class="stat-number">46</div>
+          <div class="stat-label">representative architectures</div>
+        </div>
+      </div>
+      <div class="column is-3-tablet is-6-mobile">
+        <div class="stat-card">
+          <div class="stat-number">8</div>
+          <div class="stat-label">model categories</div>
+        </div>
+      </div>
+      <div class="column is-3-tablet is-6-mobile">
+        <div class="stat-card">
+          <div class="stat-number">96.2%</div>
+          <div class="stat-label">HF Transformers coverage (409 / 425)</div>
+        </div>
+      </div>
+      <div class="column is-3-tablet is-6-mobile">
+        <div class="stat-card">
+          <div class="stat-number">L1&ndash;L4</div>
+          <div class="stat-label">compositional task hierarchy</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Abstract -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            LLM-based agents for GPU kernel generation are advancing rapidly, yet their progress is fundamentally constrained by the
+            benchmarks they optimize against. Existing benchmarks are poorly aligned with production inference frameworks: they
+            evaluate kernels on a single GPU with synthetic inputs, ignore the surrounding compilation stack, and reward replicating
+            known optimizations rather than discovering new ones. The resulting reward signals are misleading&mdash;agents learn to
+            generate kernels that score well in sandboxes but introduce interface incompatibilities, compilation-stack conflicts, and
+            silent correctness degradation when integrated into real systems.
+          </p>
+          <p>
+            We introduce <b>FastKernels</b>, a kernel benchmark built around a minimal set of <b>46 representative architectures</b>
+            spanning 8 categories, whose kernels collectively subsume those of <b>96.2% (409/425)</b> of HuggingFace Transformers
+            architectures. FastKernels doubles as a minimalistic, production-grade inference framework that runs at parity with
+            hardened systems such as vLLM and SGLang on mainstream LLM serving and substantially exceeds upstream references on
+            under-served architectures; each task's interface mirrors the corresponding module in the state-of-the-art library for its
+            architecture family, enabling direct deployment of optimized kernels into production codebases.
+          </p>
+          <p>
+            Evaluating state-of-the-art kernel agents on FastKernels, we find that even the strongest agent achieves only
+            <b>0.94&times;</b> aggregate speedup over production baselines, with weaker agents at <b>0.78&times;</b> and
+            <b>0.53&times;</b>&mdash;confirming that benchmark&ndash;production misalignment is a critical bottleneck for the field.
+            We release FastKernels as a stepping stone toward kernel agents whose benchmark gains translate directly into production
+            throughput improvements.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Why FastKernels -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Why FastKernels?</h2>
+        <div class="content has-text-justified">
+          <p>
+            LLM-based kernel-generation agents now achieve strong scores on isolated benchmarks, with state-of-the-art systems
+            autonomously compiling, profiling, and refining CUDA or Triton code. Yet these gains often fail to transfer into
+            production inference frameworks such as <b>vLLM</b> and <b>SGLang</b>: kernels that score well in sandboxes routinely
+            regress once they encounter real serving interfaces, compilation stacks, and workloads.
+          </p>
+          <p>
+            The root cause is <b>benchmark&ndash;production misalignment</b>. Current benchmarks rely on synthetic inputs, single-GPU
+            isolated kernels, simplified interfaces, and independent task levels that do not compose into full inference pipelines.
+            They therefore reward kernels that are fast in isolation but brittle in deployed systems, hiding interface mismatches,
+            compilation-stack conflicts, and correctness degradation that only appears at model scale.
+          </p>
+          <p>
+            FastKernels closes this gap by being a benchmark that <b>is</b> the framework: optimized kernels run inside a real
+            inference pipeline rather than being ported from a separate harness, and each task's interface mirrors the corresponding
+            module in production libraries so winning kernels are immediately deployable.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Contributions -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Contributions</h2>
+      </div>
+    </div>
+
+    <div class="columns is-multiline">
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
+            <i class="fas fa-cogs" style="margin-right: 0.5rem;"></i> Benchmark-as-framework
+          </h3>
+          <p>
+            FastKernels is a self-contained inference framework whose task interfaces match production modules, so optimized
+            kernels can be evaluated in place and transferred into systems such as vLLM and SGLang with no heavy refactoring.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
+            <i class="fas fa-layer-group" style="margin-right: 0.5rem;"></i> Compositional task hierarchy
+          </h3>
+          <p>
+            Tasks progress from primitives (L1) to fused operators (L2), layers (L3), and full models (L4). Agents can reuse
+            lower-level optimizations inside higher-level modules instead of solving each level independently.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
+            <i class="fas fa-microchip" style="margin-right: 0.5rem;"></i> Production-faithful evaluation
+          </h3>
+          <p>
+            Kernels are evaluated with production baselines (cuBLAS, FlashAttention-3, FlashInfer, vLLM CUDA ops, DeepGEMM, FLA),
+            captured tensors, compilation-stack effects, and multi-GPU communication including tensor and expert parallelism.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
+            <i class="fas fa-check-double" style="margin-right: 0.5rem;"></i> End-to-end validation &amp; metrics
+          </h3>
+          <p>
+            FastKernels injects generated kernels into full model executions, checks downstream quality, and reports
+            <b>MacroEval</b>, which combines calibrated correctness, coverage, and end-to-end throughput&ndash;latency speedup
+            across model families.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
+            <i class="fas fa-globe" style="margin-right: 0.5rem;"></i> Broad architecture coverage
+          </h3>
+          <p>
+            46 architectures across 8 categories&mdash;dense and MoE LLMs, linear attention and SSMs, vision, audio, video,
+            robotics, 3D graphics, recommendation, and world models&mdash;benchmarked against production references rather than
+            hardware-theoretical bounds.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
+            <i class="fas fa-network-wired" style="margin-right: 0.5rem;"></i> Multi-GPU communication kernels
+          </h3>
+          <p>
+            To our knowledge the first kernel benchmark to include collectives as first-class tasks: tensor-parallel all-reduce
+            / reduce-scatter, expert-parallel all-to-all dispatch and combine for MoE routing, and computation&ndash;communication
+            overlap kernels.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Task Hierarchy -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Compositional Task Hierarchy</h2>
+        <div class="content has-text-justified">
+          <p>
+            FastKernels organizes tasks into four levels of increasing scope. Unlike benchmarks whose levels are independent,
+            this hierarchy enables a dynamic-programming style optimization loop: an agent can reuse an optimized lower-level
+            kernel (e.g. a linear operator) when optimizing higher-level modules (e.g. MLPs or transformer blocks), instead of
+            rediscovering the same building block from scratch.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-multiline">
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5"><span style="color: var(--accent-hover);">L1</span> &mdash; Primitive operators</h3>
+          <p>
+            Individual operations: attention variants (GQA, MLA, sliding-window), normalizations (RMSNorm, LayerNorm),
+            activations (SwiGLU, GeGLU), positional encodings (RoPE, ALiBi), and quantization/dequantization routines.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5"><span style="color: var(--accent-hover);">L2</span> &mdash; Fused operators</h3>
+          <p>
+            Multi-operation kernels representing natural fusion opportunities as they arise in real models: residual-add + RMSNorm
+            + quantization, attention + output projection, MoE gate + dispatch + expert computation.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5"><span style="color: var(--accent-hover);">L3</span> &mdash; Full layers and blocks</h3>
+          <p>
+            Complete architectural blocks: transformer decoder layers, SSM scan blocks, MoE layers with routing, cross-attention
+            layers, and vision encoder stages.
+          </p>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="stat-card" style="text-align: left; height: 100%;">
+          <h3 class="title is-5"><span style="color: var(--accent-hover);">L4</span> &mdash; End-to-end models</h3>
+          <p>
+            Full model inference paths evaluated as integrated systems. The 46 representative architectures in L4 serve as the
+            end-to-end evaluation set, and underlying L1&ndash;L3 kernels cover the overwhelming majority of operators across
+            ML and AI models.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Results -->
+<section class="section">
+  <div class="container is-max-desktop">
+
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Results</h2>
+
+        <h2 class="title is-5">Per-architecture speedup over production references</h2>
+
+        <center><img src="./images/eval_speedup_breakdown_compact.png" alt="Per-architecture speedup breakdown" width="100%"></center>
+
+        <div class="content has-text-justified">
+          <p>
+            <b>Each bar shows the speedup of FastKernels over the strongest production or upstream reference for one architecture.</b>
+            Panels group architectures by category; the dashed line in each panel marks the average speedup within that category.
+          </p>
+          <p>
+            Across 46 representative benchmarks, FastKernels averages <b>1.24&times;</b> throughput (<b>1.04&times;</b> median).
+            On mainstream LLM serving against hardened frameworks like vLLM and SGLang, FastKernels sits at parity
+            (e.g. Llama-3.1 1.04&times;, GPT-OSS 1.02&times;, Mixtral 0.97&times;, DeepSeek-V3.2 0.84&times;). Supra-unity gains
+            concentrate on architectures whose only available reference is a research repository or a non-serving library:
+            <b>Pi0 3.48&times;</b>, <b>ColBERTv2 3.08&times;</b>, <b>CosyVoice3 2.13&times;</b>, RetNet / GLA ~1.86&times; vs. FLA.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <br>
+        <h2 class="title is-5">Existing kernel agents fall below 1&times; on production-shaped tasks</h2>
+
+        <center><img src="./images/evaluation_kernelagent.png" alt="Kernel agent evaluation" width="100%"></center>
+
+        <div class="content has-text-justified">
+          <p>
+            We evaluate three state-of-the-art kernel-generation agents&mdash;<b>Dr.&nbsp;Kernel</b>, <b>KernelAgent</b>, and
+            <b>OpenAI Codex</b>&mdash;on FastKernels L1 and L2 (88 target families). On aggregate, all three land
+            <b>below 1&times;</b> against production-grade references:
+          </p>
+          <ul>
+            <li><b>OpenAI Codex:</b> 0.943&times; geomean (88/88 correct)</li>
+            <li><b>KernelAgent:</b> 0.777&times; geomean (28/76 correct)</li>
+            <li><b>Dr. Kernel:</b> 0.527&times; geomean (8/38 correct)</li>
+          </ul>
+          <p>
+            Two findings explain the gap: <b>(1)</b> production-grade references (cuBLAS, FlashAttention-3, FlashInfer, DeepGEMM,
+            FLA) separate apparent gains from real ones&mdash;Codex hits 1.16&times; on torch-eager-wrapped operators but only
+            0.93&times; on vendor- or hand-written kernels; and <b>(2)</b> production-shaped composite modules (full attention,
+            MoE, and YOLOv10 blocks lifted from production code) are markedly harder than primitives&mdash;every agent that
+            reaches L2 regresses on it.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <br>
+        <h2 class="title is-5">Captured tensors matter: MoE routing study</h2>
+
+        <center><img src="./images/moe_input_capture.png" alt="MoE captured tensors study" width="100%"></center>
+
+        <div class="content has-text-justified">
+          <p>
+            FastKernels captures and replays the tensors production models actually feed to kernels. Our MoE routing study shows
+            that <b>synthetic inputs materially change both load skew and hot-expert identity</b>: kernels that look great on
+            uniform-random routing decisions can underperform once the actual production routing distribution is replayed.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<hr>
+
+<!-- MacroEval -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">MacroEval: Cross-Architecture Metrics</h2>
+        <div class="content has-text-justified">
+          <p>
+            Model families expose different correctness signals&mdash;tokens, embeddings, labels, rankings, trajectories, audio,
+            video&mdash;and different throughput&ndash;latency tradeoffs. <b>MacroEval</b> calibrates architecture-specific
+            correctness to a common [0,&nbsp;1] scale, measures end-to-end speedup, and macro-averages across families so no single
+            architecture dominates the leaderboard.
+          </p>
+          <p>
+            The default leaderboard score multiplies three components: macro-geometric speedup <i>S</i><sub>macro</sub>,
+            macro-calibrated correctness <i>C</i><sub>macro</sub>, and macro-coverage. This rewards agents that are
+            simultaneously <b>fast, correct, and broadly applicable</b>, while still exposing the three component metrics so users
+            can identify throughput&ndash;correctness or coverage&ndash;performance tradeoffs.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- Getting Started -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Getting Started</h2>
+        <div class="content has-text-justified">
+          <p>
+            FastKernels requires Python 3.10+, CUDA 12.x, and a recent NVIDIA GPU (Hopper / Blackwell tested; Ampere supported
+            for a subset of kernels). Clone the repository and install:
+          </p>
+<pre><code>git clone git@github.com:sfc-gh-goliaro/kb_nano.git
+cd kb_nano
+pip install .</code></pre>
+          <p>
+            Each supported architecture is implemented under <code>tasks/baseline/</code>, organized by level. To scaffold a
+            candidate kernel with the correct signature:
+          </p>
+<pre><code># Scaffold candidate stubs
+python agent/create_stubs.py                       # all operators
+python agent/create_stubs.py --level 1             # L1 only
+python agent/create_stubs.py --architecture llama  # Llama only</code></pre>
+          <p>
+            Then drop your replacement in <code>tasks/candidate/L&lt;level&gt;/&lt;op_name&gt;.py</code> exposing the same class
+            name and <code>forward</code> signature as the baseline. The benchmark validates correctness against the production
+            reference and reports speedup:
+          </p>
+<pre><code># Kernel-level: correctness + speedup for a single operator
+kb_nano kernels --target rms_norm
+
+# Standardized end-to-end eval sweep
+kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
+          <p style="text-align: center; margin-top: 1.2rem;">
+            <a href="https://snowflake-84d72a0d.mintlify.app/intro" class="external-link button is-normal is-rounded is-dark">
+              <span class="icon"><i class="fas fa-book"></i></span>
+              <span>Full Documentation</span>
+            </a>
+            <a href="https://github.com/sfc-gh-goliaro/kb_nano" class="external-link button is-normal is-rounded is-dark">
+              <span class="icon"><i class="fab fa-github"></i></span>
+              <span>Code</span>
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- FAQ -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Frequently Asked Questions</h2>
+      </div>
+    </div>
+
+    <div class="columns is-centered">
+      <div class="column is-four-fifths">
+        <div class="content has-text-justified">
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              How is FastKernels different from KernelBench and similar benchmarks?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                Existing benchmarks construct tasks bottom-up by combining primitive operators or extracting subgraphs via
+                automated pipelines, evaluate on a single GPU with synthetic inputs, and compare against PyTorch eager. FastKernels
+                takes a <b>top-down</b> approach: it starts from real model families, walks the forward pass, and produces
+                standalone tasks whose interfaces match the corresponding modules in production libraries (vLLM, SGLang,
+                diffusers, FLA, timm). Speedups are measured against the kernels production systems actually ship&mdash;cuBLAS,
+                FlashAttention-3, FlashInfer, vLLM CUDA ops, DeepGEMM&mdash;not torch eager.
+              </p>
+            </div>
+          </details>
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              Why only 46 architectures? Doesn't that limit coverage?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                FastKernels consolidates near-identical operators (e.g. RoPE variants, normalizations, attention backends) into a
+                single L1/L2 task and picks a small set of representative architectures whose union of operators subsumes the
+                long tail of model families. An audit of every PyTorch modeling file in HuggingFace Transformers (commit
+                <code>da6c53e4</code>; 425 entries) indicates that these 46 architectures cover <b>96.2% (409/425)</b> of HF
+                architectures with no new compute primitive&mdash;only 5 architectures require a genuinely new kernel and 2
+                require an external library.
+              </p>
+            </div>
+          </details>
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              Can I deploy a kernel optimized with FastKernels into vLLM or SGLang?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                Yes. Each task's <code>__init__</code> constructor signature and <code>forward</code> method are designed to
+                closely match the corresponding module in the state-of-the-art library for its architecture family. A kernel
+                optimized within FastKernels can be deployed into vLLM, SGLang, or another production framework essentially via a
+                copy-paste of the module, with no heavy interface refactoring. Unlike FlashInfer-Bench's FIApply (which substitutes
+                at the kernel dispatch level), FastKernels operates at the <b>module level</b>&mdash;the unit of composition that
+                production frameworks actually use.
+              </p>
+            </div>
+          </details>
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              How does FastKernels handle multi-GPU collectives?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                Production inference at scale is almost always distributed, and the resulting collectives, synchronization
+                barriers, and communication&ndash;computation overlaps materially affect end-to-end latency. To our knowledge
+                FastKernels is the first kernel benchmark to include them as first-class tasks: tensor-parallel all-reduce /
+                reduce-scatter, expert-parallel all-to-all dispatch and combine for MoE routing (DeepSeek-V3, Mixtral), and overlap
+                kernels that must hide NCCL collectives behind computation. A kernel that achieves 1.5&times; on a single GPU can
+                still degrade end-to-end throughput if it disrupts the communication schedule&mdash;these tasks are unreachable
+                from single-GPU benchmarks.
+              </p>
+            </div>
+          </details>
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              What kernel-generation agents has FastKernels been evaluated against?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                We evaluate three state-of-the-art agents on FastKernels L1 and L2 (88 target families):
+              </p>
+              <ul>
+                <li><b>OpenAI Codex</b> &mdash; 0.943&times; geomean, 88/88 correct</li>
+                <li><b>KernelAgent</b> &mdash; 0.777&times; geomean, 28/76 correct</li>
+                <li><b>Dr. Kernel</b> &mdash; 0.527&times; geomean, 8/38 correct</li>
+              </ul>
+              <p>
+                All three land below 1&times; on aggregate, in contrast to the supra-unity numbers reported on operator-level
+                benchmarks whose reference is PyTorch eager. The per-target results pinpoint two design choices in FastKernels
+                that account for the gap: production-grade references and production-shaped composite modules at L2.
+              </p>
+            </div>
+          </details>
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              Can I add my own architecture to FastKernels?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                Yes. For each model architecture, the FastKernels construction pipeline loads the HuggingFace configuration and
+                architecture definition, walks the forward pass, and produces standalone task implementations for each kernel
+                with all configuration constants (hidden size, number of heads, data types) inlined from the model's
+                configuration. The pipeline ships as part of the framework, so users can add new architectures from HuggingFace
+                with minimal effort. See the <a href="https://snowflake-84d72a0d.mintlify.app/intro">documentation</a> for
+                details.
+              </p>
+            </div>
+          </details>
+
+          <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
+            <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
+              <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
+              What's the benchmarking workflow?
+            </summary>
+            <div style="margin-top: 1rem; padding-left: 1.5rem;">
+              <p>
+                FastKernels exposes three tiers of increasing scope:
+              </p>
+              <ul>
+                <li><b>Tier 1 &mdash; Kernel:</b> instantiates a candidate operator next to the baseline, copies weights, and
+                compares <code>forward()</code> outputs and runtimes across an input registry of shapes, dtypes, and init
+                arguments. For data-dependent operators (e.g. MoE dispatch) it replays golden inputs captured from real
+                end-to-end executions.</li>
+                <li><b>Tier 2 &mdash; E2E:</b> end-to-end model benchmarks, measuring full-model throughput, latency, and
+                serving behavior under user-specified workloads.</li>
+                <li><b>Tier 3 &mdash; Eval:</b> standardized evaluation sweeps, comparing baseline and candidate executions
+                across fixed models, tensor-parallel configurations, and throughput&ndash;latency workloads. This is the
+                benchmark used for the leaderboard.</li>
+              </ul>
+              <p>
+                Profiling is first-class: Tier 1 integrates with NVIDIA Nsight Compute (NCU); Tier 2 with NVIDIA Nsight Systems
+                (NSYS). MLflow integration tracks kernel lineage and benchmark history.
+              </p>
+            </div>
+          </details>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr>
+
+<!-- BibTeX -->
+<section class="section" id="BibTeX">
+  <div class="container is-max-desktop content">
+    <h2 class="title">BibTeX</h2>
+    <pre><code>@article{oliaro2026fastkernels,
+  author    = {Gabriele Oliaro and Yichao Fu and May Jiang and Owen Lu and
+               Junli Wang and Hao Zhang and Zhihao Jia and Samyam Rajbhandari},
+  title     = {FastKernels: Benchmarking GPU Kernel Generation in Production},
+  journal   = {arXiv preprint arXiv:2605.23215},
+  year      = {2026},
+  url       = {https://arxiv.org/abs/2605.23215}
+}</code></pre>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p style="text-align:center;font-size:small;">
+            FastKernels is developed by Snowflake AI Research, Carnegie Mellon University, and UC San Diego.
+          </p>
+          <p style="text-align:right;font-size:small;">
+          <a href="https://github.com/nerfies/nerfies.github.io">
+            Webpage template credits
+          </a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+  <script>
+    // Theme management
+    (function() {
+      const themeToggle = document.getElementById('theme-toggle');
+      const themeIcon = document.getElementById('theme-icon');
+      const body = document.body;
+
+      function getInitialTheme() {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+          return savedTheme;
+        }
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          return 'dark';
+        }
+        return 'light';
+      }
+
+      function applyTheme(theme) {
+        if (theme === 'dark') {
+          body.setAttribute('data-theme', 'dark');
+          themeIcon.className = 'fas fa-sun';
+          themeToggle.setAttribute('aria-label', 'Switch to light mode');
+        } else {
+          body.setAttribute('data-theme', 'light');
+          themeIcon.className = 'fas fa-moon';
+          themeToggle.setAttribute('aria-label', 'Switch to dark mode');
+        }
+        localStorage.setItem('theme', theme);
+      }
+
+      function toggleTheme() {
+        const currentTheme = body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+      }
+
+      const initialTheme = getInitialTheme();
+      applyTheme(initialTheme);
+
+      themeToggle.addEventListener('click', toggleTheme);
+
+      if (window.matchMedia) {
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+          if (!localStorage.getItem('theme')) {
+            applyTheme(e.matches ? 'dark' : 'light');
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
