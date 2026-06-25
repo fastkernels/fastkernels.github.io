@@ -6,6 +6,4 @@ Project page for **FastKernels: Benchmarking GPU Kernel Generation in Production
 - Code: <https://github.com/Snowflake-AI-Research/fastkernels>
 - Docs: <https://snowflake-84d72a0d.mintlify.app/intro>
 
-The site is a static page served via GitHub Pages from `index.html`. Template adapted from
-[suffix-decoding.github.io](https://github.com/Suffix-Decoding/suffix-decoding.github.io), which in turn is
-based on the [Nerfies](https://github.com/nerfies/nerfies.github.io) project page template.
+The site is a static page served via GitHub Pages from `index.html`. Template adapted from [Nerfies](https://github.com/nerfies/nerfies.github.io) project page template.
