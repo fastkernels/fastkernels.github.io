@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FastKernels Leaderboard: kernel agents, scored end to end</title>
+<meta name="description" content="How much of a kernel agent's speedup survives into a real inference server. Kernel agents scored end to end with MacroEval on NVIDIA B200.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M18 5 8 18h7l-2 9 10-13h-7z' fill='white'/%3E%3C/svg%3E">
+<script>
+  (function () {
+    var t = 'light';
+    try {
+      t = localStorage.getItem('fk-theme') ||
+        (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    } catch (e) {}
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<style>
+  :root {
+    --bg: #f6f7fb; --panel: #ffffff; --panel-2: #f1f4f9; --code-bg: #eef1f7;
+    --fg: #0f172a; --fg-2: #334155; --muted: #64748b;
+    --line: #e2e8f0; --line-2: #edf1f6; --grid: rgba(15, 23, 42, .045);
+    --accent: #4f46e5; --accent-2: #06b6d4;
+    --pos: #059669; --pos-bg: rgba(16, 185, 129, .13);
+    --neg: #e11d48; --neg-bg: rgba(244, 63, 94, .12);
+    --warn: #d97706; --warn-bg: rgba(245, 158, 11, .16);
+    --shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 10px 30px -12px rgba(15, 23, 42, .12);
+    --term: #0b1020; --term-fg: #dbe3f0; --term-muted: #7c8aa5;
+    --radius: 14px;
+    --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    --bg: #0a0e17; --panel: #0f1521; --panel-2: #151d2c; --code-bg: #1a2334;
+    --fg: #e6eaf2; --fg-2: #c2cad8; --muted: #8a95a8;
+    --line: #222c3e; --line-2: #1a2232; --grid: rgba(255, 255, 255, .035);
+    --accent: #8b8cf8; --accent-2: #22d3ee;
+    --pos: #34d399; --pos-bg: rgba(52, 211, 153, .13);
+    --neg: #fb7185; --neg-bg: rgba(251, 113, 133, .13);
+    --warn: #fbbf24; --warn-bg: rgba(251, 191, 36, .14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 32px -14px rgba(0, 0, 0, .6);
+    --term: #070a12;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body {
+    margin: 0; font: 15px/1.6 var(--sans); color: var(--fg); background: var(--bg);
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: .86em; background: var(--code-bg); padding: .12em .38em; border-radius: 5px; }
+  sub { font-size: .7em; }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 0 24px; }
+  .nil { color: var(--muted); }
+
+  /* ---------- top bar ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 50; border-bottom: 1px solid var(--line);
+    background: color-mix(in oklab, var(--bg) 80%, transparent);
+    backdrop-filter: saturate(180%) blur(14px); -webkit-backdrop-filter: saturate(180%) blur(14px);
+  }
+  .topbar-inner { display: flex; align-items: center; gap: 20px; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; font-size: 1.05rem; color: var(--fg); letter-spacing: -.01em; }
+  .brand:hover { text-decoration: none; }
+  .logo {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 16px -6px var(--accent);
+  }
+  .nav-links { display: flex; gap: 2px; margin-left: 6px; }
+  .nav-links a { color: var(--fg-2); padding: 7px 12px; border-radius: 8px; font-size: .92rem; font-weight: 500; }
+  .nav-links a:hover { background: var(--panel-2); color: var(--fg); text-decoration: none; }
+  .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font: 600 .9rem/1 var(--sans); padding: 10px 16px; border-radius: 10px;
+    border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: transform .12s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .btn:hover { text-decoration: none; }
+  .btn-primary {
+    color: #fff; background: linear-gradient(135deg, var(--accent), color-mix(in oklab, var(--accent) 55%, var(--accent-2)));
+    box-shadow: 0 8px 22px -10px var(--accent);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px -10px var(--accent); }
+  .btn-ghost { background: var(--panel); border-color: var(--line); color: var(--fg); }
+  .btn-ghost:hover { background: var(--panel-2); }
+  .btn-lg { padding: 14px 22px; font-size: 1rem; border-radius: 12px; }
+  .btn-block { width: 100%; }
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--fg-2); display: grid; place-items: center; cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--panel-2); color: var(--fg); }
+  .icon-btn .sun { display: none; }
+  [data-theme="dark"] .icon-btn .sun { display: block; }
+  [data-theme="dark"] .icon-btn .moon { display: none; }
+
+  /* ---------- hero ---------- */
+  .hero { position: relative; overflow: hidden; padding: 76px 0 36px; }
+  .hero::before, .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+  .hero::before {
+    background:
+      radial-gradient(640px 320px at 12% -4%, color-mix(in oklab, var(--accent) 24%, transparent), transparent 70%),
+      radial-gradient(560px 300px at 88% 6%, color-mix(in oklab, var(--accent-2) 20%, transparent), transparent 70%);
+  }
+  .hero::after {
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 80%);
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 0%, #000 30%, transparent 80%);
+  }
+  .hero .wrap { position: relative; z-index: 1; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px; padding: 6px 13px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--fg-2); font-size: .82rem; font-weight: 500;
+  }
+  .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pos); box-shadow: 0 0 0 4px color-mix(in oklab, var(--pos) 22%, transparent); }
+  h1 { font-size: clamp(2.3rem, 5.2vw, 3.8rem); line-height: 1.04; letter-spacing: -.038em; margin: 20px 0 18px; font-weight: 820; max-width: 16ch; }
+  .grad { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { font-size: 1.16rem; color: var(--fg-2); max-width: 62ch; margin: 0 0 30px; }
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 46px; }
+  .stat {
+    position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 18px 16px; box-shadow: var(--shadow); overflow: hidden;
+  }
+  .stat::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); opacity: .85; }
+  .stat-big { font-size: 1.8rem; font-weight: 800; letter-spacing: -.025em; line-height: 1.1; }
+  .stat-big .arrow { color: var(--muted); font-weight: 500; margin: 0 .1em; }
+  .stat-label { color: var(--muted); font-size: .86rem; margin-top: 7px; line-height: 1.45; }
+
+  /* ---------- panels ---------- */
+  main { padding-bottom: 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); padding: 26px 26px 20px; margin: 22px 0; }
+  .panel-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px 24px; flex-wrap: wrap; margin-bottom: 18px; }
+  h2 { font-size: 1.45rem; letter-spacing: -.022em; margin: 0 0 4px; }
+  h3 { letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0; font-size: .93rem; max-width: 72ch; }
+  .controls { display: flex; gap: 14px; flex-wrap: wrap; }
+  .control { display: flex; flex-direction: column; gap: 6px; }
+  .control-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); font-weight: 650; }
+  .seg { display: inline-flex; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button {
+    font: 550 .83rem/1 var(--sans); color: var(--fg-2); background: transparent; border: 0;
+    padding: 8px 11px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s;
+  }
+  .seg button:hover:not(:disabled) { color: var(--fg); }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--fg); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 0 0 1px var(--line); }
+  .seg button:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* ---------- tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 0 -10px; padding: 0 10px; }
+  table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
+  th, td { padding: 12px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+  th { font-size: .69rem; text-transform: uppercase; letter-spacing: .075em; color: var(--muted); font-weight: 650; border-bottom: 1px solid var(--line); }
+  th.l, td.l { text-align: left; }
+  th.c, td.c { text-align: center; }
+  th[data-tip] { text-decoration: underline dotted color-mix(in oklab, var(--muted) 60%, transparent); text-underline-offset: 3px; }
+  th.sort { cursor: pointer; user-select: none; }
+  th.sort:hover { color: var(--fg); }
+  th.active { color: var(--accent); }
+  th.active::after { content: " \2193"; }
+  td.active { background: color-mix(in oklab, var(--accent) 5%, transparent); }
+  tbody tr:last-child > td { border-bottom: 0; }
+  .subv { font-size: .76rem; color: var(--muted); margin-top: 2px; line-height: 1.3; }
+
+  tr.row { cursor: pointer; }
+  tr.row > td { transition: background .15s; }
+  tr.row:hover > td, tr.row:focus-visible > td { background: var(--panel-2); }
+  tr.row:focus-visible { outline: none; }
+  tr.row.open > td { background: var(--panel-2); border-bottom-color: transparent; }
+  .chev { display: inline-block; color: var(--muted); transition: transform .2s; margin-left: 6px; vertical-align: middle; }
+  tr.row.open .chev { transform: rotate(90deg); }
+
+  .rank {
+    display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
+    font-weight: 750; font-size: .86rem; background: var(--panel-2); color: var(--muted); border: 1px solid var(--line);
+  }
+  .rank.r1 { background: linear-gradient(135deg, #fde68a, #f59e0b); color: #3b2503; border-color: transparent; box-shadow: 0 4px 12px -4px #f59e0b; }
+  .rank.r2 { background: linear-gradient(135deg, #f1f5f9, #94a3b8); color: #0f172a; border-color: transparent; }
+  .rank.r3 { background: linear-gradient(135deg, #fed7aa, #c2410c); color: #3b1204; border-color: transparent; }
+
+  .agent { display: flex; align-items: center; gap: 11px; }
+  .avatar {
+    flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    font-weight: 800; font-size: .7rem; letter-spacing: .02em; color: #fff;
+    background: linear-gradient(135deg, var(--c), color-mix(in oklab, var(--c) 60%, #000));
+    box-shadow: 0 4px 12px -6px var(--c);
+  }
+  .avatar.sm { width: 24px; height: 24px; border-radius: 7px; font-size: .56rem; }
+  .agent-name { font-weight: 650; color: var(--fg); line-height: 1.25; }
+  .agent-kind { font-size: .76rem; color: var(--muted); line-height: 1.3; white-space: normal; max-width: 190px; }
+  .agent-kind.nw { white-space: nowrap; max-width: none; }
+
+  .mode { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--fg-2); background: var(--panel); }
+  .mode::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--mc, var(--muted)); }
+  .mode-ind { --mc: #3b82f6; }
+  .mode-comp { --mc: #94a3b8; }
+  .mode-seq { --mc: #a855f7; }
+
+  .score { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .score b { font-size: 1.08rem; font-weight: 750; }
+  .bar { display: block; width: 84px; height: 6px; border-radius: 999px; background: var(--panel-2); overflow: hidden; border: 1px solid var(--line-2); }
+  .bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  tr.lead .score b { color: var(--accent); }
+
+  .chip { display: inline-block; padding: 3px 8px; border-radius: 7px; font-weight: 650; font-size: .86rem; line-height: 1.3; }
+  .chip.pos { color: var(--pos); background: var(--pos-bg); }
+  .chip.pos2 { color: color-mix(in oklab, var(--pos) 78%, var(--fg)); background: color-mix(in oklab, var(--pos) 30%, transparent); }
+  .chip.neg { color: var(--neg); background: var(--neg-bg); }
+  .chip.neu { color: var(--fg-2); background: var(--panel-2); }
+  .best { font-weight: 800; color: var(--accent); }
+  .chip.is-best { box-shadow: 0 0 0 2px var(--accent); }
+
+  .strip { display: inline-flex; gap: 3px; vertical-align: middle; }
+  .sq { display: inline-block; width: 10px; height: 20px; border-radius: 3px; }
+  .sq.ok { background: var(--pos); }
+  .sq.low { background: var(--warn); }
+  .sq.fail { background: repeating-linear-gradient(135deg, var(--neg-bg) 0 3px, transparent 3px 6px); box-shadow: 0 0 0 1px color-mix(in oklab, var(--neg) 55%, transparent) inset; }
+  .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: .82rem; }
+  .legend .sq { width: 10px; height: 14px; vertical-align: -2px; margin-right: 6px; }
+  .legend .hint { margin-left: auto; }
+
+  /* ---------- expanded row ---------- */
+  tr.detail > td { padding: 0 10px 18px; background: var(--panel-2); text-align: left; white-space: normal; }
+  .detail-grid { display: grid; grid-template-columns: 1.1fr 1.5fr 1.1fr .9fr; gap: 12px; }
+  .dcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .dcard h4 { margin: 0 0 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .dcard p { margin: 0 0 8px; font-size: .88rem; }
+  .dcard dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: .84rem; }
+  .dcard dt { color: var(--muted); }
+  .dcard dd { margin: 0; }
+  table.mini th, table.mini td { padding: 5px 6px; font-size: .8rem; }
+  table.mini th { font-size: .62rem; }
+  .hbar { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; align-items: center; font-size: .82rem; margin-bottom: 6px; }
+  .hbar .track { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
+  .hbar .track i { display: block; height: 100%; background: var(--neg); opacity: .75; border-radius: inherit; }
+  .hbar.kept .track i { background: var(--pos); opacity: 1; }
+  .ranks { display: flex; gap: 8px; }
+  .ranks div { flex: 1; text-align: center; padding: 8px 4px; background: var(--panel-2); border-radius: 9px; }
+  .ranks b { display: block; font-size: 1.15rem; }
+  .ranks span { font-size: .7rem; color: var(--muted); }
+
+  /* ---------- tabs ---------- */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 0 0 18px; overflow-x: auto; }
+  .tabs button {
+    font: 600 .92rem/1 var(--sans); color: var(--muted); background: none; border: 0; cursor: pointer;
+    padding: 12px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  .tabs button:hover { color: var(--fg); }
+  .tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+  .tabpanel[hidden] { display: none; }
+  .tab-intro { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tab-intro p { margin: 0; color: var(--fg-2); font-size: .92rem; max-width: 76ch; }
+  .callout { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: color-mix(in oklab, var(--accent) 7%, var(--panel)); border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--line)); font-size: .9rem; color: var(--fg-2); margin-bottom: 14px; }
+  .callout b { color: var(--fg); }
+
+  /* heatmap */
+  table.heat th, table.heat td { padding: 8px 6px; }
+  table.heat thead th { text-align: center; }
+  table.heat th.fam { font-size: .64rem; color: var(--fg-2); border-bottom: 2px solid var(--line); }
+  table.heat th.mdl { font-size: .68rem; text-transform: none; letter-spacing: 0; font-weight: 600; color: var(--fg-2); }
+  table.heat tbody th { text-transform: none; letter-spacing: 0; font-size: .85rem; color: var(--fg); font-weight: 600; border-bottom: 1px solid var(--line-2); }
+  td.hc { text-align: center; font-size: .82rem; font-weight: 650; min-width: 64px; border-left: 2px solid var(--panel); border-radius: 6px; }
+  td.hc.low { background: var(--warn-bg); color: var(--warn); }
+  td.hc.fail { background: repeating-linear-gradient(135deg, var(--neg-bg) 0 4px, transparent 4px 8px); color: var(--neg); font-weight: 600; font-size: .74rem; }
+  td.hc.okas { background: var(--pos-bg); color: var(--pos); }
+  td.hc small { display: block; font-size: .62rem; font-weight: 600; opacity: .85; }
+  .set-label { display: flex; align-items: center; gap: 8px; }
+  .set-label .m { font-size: .72rem; color: var(--muted); font-weight: 500; }
+
+  /* kernel table */
+  table.kern td.agent-cell { vertical-align: top; padding-top: 14px; }
+  table.kern tr.grp-start > td { border-top: 1px solid var(--line); }
+  table.kern tr.grp-start:first-child > td { border-top: 0; }
+  table.kern th.lvl { text-align: center; color: var(--fg-2); border-bottom: 2px solid var(--line); }
+  table.kern td.lv-start, table.kern th.lv-start { border-left: 1px solid var(--line-2); }
+  .corr { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .corr .of { color: var(--muted); font-size: .8em; }
+  .mbar { display: block; width: 46px; height: 4px; border-radius: 99px; background: var(--panel-2); overflow: hidden; }
+  .mbar i { display: block; height: 100%; background: var(--fg-2); opacity: .55; }
+  .fp { color: var(--fg-2); font-size: .86rem; }
+  .broke { display: inline-block; min-width: 24px; padding: 2px 7px; border-radius: 999px; font-weight: 700; font-size: .8rem; text-align: center; }
+  .broke.bad { background: var(--neg-bg); color: var(--neg); }
+  .broke.none { color: var(--muted); }
+
+  /* cost */
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+  .chart h4 { margin: 0 0 12px; font-size: .74rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .crow { display: grid; grid-template-columns: 120px 1fr 78px; align-items: center; gap: 12px; margin: 10px 0; font-size: .86rem; }
+  .crow .who { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .ctrack { display: flex; height: 14px; border-radius: 5px; overflow: hidden; background: var(--panel-2); }
+  .ctrack i { display: block; height: 100%; }
+  .ctrack i.ind { background: var(--c); }
+  .ctrack i.seq { background: color-mix(in oklab, var(--c) 45%, transparent); }
+  .crow .tot { text-align: right; font-variant-numeric: tabular-nums; font-weight: 650; }
+  .chart .key { display: flex; gap: 14px; font-size: .78rem; color: var(--muted); margin-top: 12px; }
+  .chart .key span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; background: var(--fg-2); }
+  .chart .key span.s::before { opacity: .4; }
+  .fine { color: var(--muted); font-size: .82rem; margin: 10px 0 0; }
+  code.hash { background: none; padding: 0; color: var(--fg-2); }
+
+  /* ---------- scoring ---------- */
+  .formula {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px;
+    padding: 20px; border-radius: 14px; margin-bottom: 16px; font-size: 1.2rem; font-weight: 650;
+    background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 9%, var(--panel)), color-mix(in oklab, var(--accent-2) 8%, var(--panel)));
+    border: 1px solid var(--line);
+  }
+  .formula .t { padding: 6px 12px; border-radius: 9px; background: var(--panel); border: 1px solid var(--line); }
+  .formula .op { color: var(--muted); font-weight: 500; }
+  .metric-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .mcard { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; border-top: 3px solid var(--mc); }
+  .mcard h3 { margin: 0 0 6px; font-size: 1rem; }
+  .mcard p { margin: 0; color: var(--fg-2); font-size: .89rem; }
+  .pipeline { list-style: none; counter-reset: p; display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 0; margin: 18px 0 0; }
+  .pipeline li { counter-increment: p; position: relative; padding: 14px 14px 12px; border-radius: 12px; background: var(--panel-2); font-size: .84rem; color: var(--fg-2); }
+  .pipeline li::before { content: counter(p); display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line); font-size: .74rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+  .pipeline li b { display: block; color: var(--fg); font-size: .92rem; margin-bottom: 2px; }
+
+  /* ---------- submit ---------- */
+  .submit {
+    position: relative; overflow: hidden; margin: 22px 0; padding: 34px 30px 30px; border-radius: 22px;
+    border: 1px solid color-mix(in oklab, var(--accent) 28%, var(--line));
+    background:
+      radial-gradient(700px 260px at 0% 0%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 70%),
+      radial-gradient(600px 260px at 100% 100%, color-mix(in oklab, var(--accent-2) 12%, transparent), transparent 70%),
+      var(--panel);
+    box-shadow: var(--shadow);
+  }
+  .submit-head { max-width: 760px; margin-bottom: 26px; }
+  .submit-head h2 { font-size: 1.9rem; margin: 14px 0 8px; }
+  .submit-head .sub { font-size: 1.02rem; color: var(--fg-2); }
+  .submit-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(300px, 1fr); gap: 22px; align-items: start; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .step { display: grid; grid-template-columns: 40px 1fr; gap: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  .step-num {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  }
+  .step h3 { margin: 4px 0 4px; font-size: 1.04rem; }
+  .step p { margin: 0 0 10px; color: var(--fg-2); font-size: .9rem; }
+  .code { position: relative; margin: 0; background: var(--term); color: var(--term-fg); border-radius: 11px; border: 1px solid rgba(255, 255, 255, .06); overflow: hidden; }
+  .code .bar-top { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px 7px 14px; border-bottom: 1px solid rgba(255, 255, 255, .07); font: 600 .68rem/1 var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--term-muted); }
+  .code pre { margin: 0; padding: 12px 14px 14px; overflow-x: auto; font: .82rem/1.65 var(--mono); }
+  .code code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .code .cm { color: var(--term-muted); }
+  .code .pr { color: #7dd3fc; user-select: none; }
+  .copy {
+    font: 600 .72rem/1 var(--sans); color: var(--term-fg); background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .1);
+    padding: 5px 9px; border-radius: 6px; cursor: pointer; text-transform: none; letter-spacing: 0;
+  }
+  .copy:hover { background: rgba(255, 255, 255, .16); }
+  .copy.done { color: #6ee7b7; }
+  .submit-card { position: sticky; top: 84px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; box-shadow: var(--shadow); }
+  .submit-card h3 { margin: 0 0 12px; font-size: 1.1rem; }
+  .checklist { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 10px; }
+  .checklist li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: .89rem; color: var(--fg-2); }
+  .checklist li::before { content: ""; width: 18px; height: 18px; margin-top: 2px; border-radius: 6px; background: var(--pos-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23059669'%3E%3Cpath d='M8.1 13.6 4.5 10l-1.4 1.4 5 5 9-9-1.4-1.4z'/%3E%3C/svg%3E") center/13px no-repeat; }
+  .checklist li.opt::before { background-color: var(--panel-2); filter: grayscale(1); opacity: .8; }
+  .checklist b { color: var(--fg); font-weight: 650; }
+  .tag { display: inline-block; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; margin-left: 4px; vertical-align: 1px; }
+  .next { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .next h4 { margin: 0 0 10px; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .next ol { margin: 0; padding-left: 18px; display: grid; gap: 7px; font-size: .86rem; color: var(--fg-2); }
+  .next li::marker { color: var(--accent); font-weight: 700; }
+
+  /* ---------- faq ---------- */
+  .faq { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  details { border: 1px solid var(--line); border-radius: 12px; padding: 0 16px; background: var(--panel); }
+  details[open] { background: var(--panel-2); }
+  summary { cursor: pointer; list-style: none; padding: 14px 0; font-weight: 650; display: flex; justify-content: space-between; gap: 12px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; color: var(--muted); font-weight: 500; font-size: 1.2rem; line-height: 1; }
+  details[open] summary::after { content: "\2212"; }
+  details p { margin: 0 0 14px; color: var(--fg-2); font-size: .9rem; }
+
+  /* ---------- footer ---------- */
+  footer { border-top: 1px solid var(--line); margin-top: 30px; padding: 26px 0 50px; color: var(--muted); font-size: .84rem; }
+  .foot { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+  .foot p { margin: 0 0 6px; }
+  .foot-links { display: flex; gap: 16px; flex-wrap: wrap; }
+
+  /* ---------- misc ---------- */
+  .tip {
+    position: fixed; top: 0; left: 0; z-index: 100; max-width: 320px; pointer-events: none;
+    background: #0b1020; color: #e6eaf2; border: 1px solid rgba(255, 255, 255, .1); border-radius: 10px;
+    padding: 9px 11px; font-size: .8rem; line-height: 1.5; box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .5);
+    opacity: 0; transition: opacity .12s; text-transform: none; letter-spacing: 0; font-weight: 400; white-space: normal; text-align: left;
+  }
+  .tip.show { opacity: 1; }
+  .tip b { color: #fff; }
+  .tip .tp-mut { color: #93a0b8; }
+  .tip .tp-pos { color: #6ee7b7; font-weight: 600; }
+  .tip .tp-neg { color: #fda4af; font-weight: 600; }
+  .tip .tp-warn { color: #fcd34d; font-weight: 600; }
+  .banner { margin: 24px 0; padding: 14px 16px; border-radius: 12px; background: var(--warn-bg); border: 1px solid color-mix(in oklab, var(--warn) 40%, transparent); color: var(--fg); font-size: .92rem; }
+
+  @media (max-width: 1080px) {
+    .detail-grid { grid-template-columns: 1fr 1fr; }
+    .submit-grid { grid-template-columns: 1fr; }
+    .submit-card { position: static; }
+    .pipeline { grid-template-columns: repeat(3, 1fr); }
+  }
+  @media (max-width: 900px) {
+    .nav-links { display: none; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .metric-cards, .cost-grid, .faq { grid-template-columns: 1fr; }
+    .legend .hint { margin-left: 0; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 0 14px; }
+    .panel { padding: 20px 16px 16px; }
+    .submit { padding: 26px 16px 18px; }
+    .stats, .detail-grid, .pipeline { grid-template-columns: 1fr; }
+    .nav-actions .btn-ghost { display: none; }
+    .hero { padding-top: 48px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="../">
+      <span class="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.5 2 4 14h6.5L9 22l10-13h-6.5z"/></svg></span>
+      FastKernels
+    </a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#leaderboard">Leaderboard</a>
+      <a href="#explore">Deep dive</a>
+      <a href="#scoring">Scoring</a>
+      <a href="#submit">Submit</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle dark mode">
+        <svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+      <a class="btn btn-ghost" data-repo-link href="#" target="_blank" rel="noopener">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+      <a class="btn btn-primary" href="#submit">Submit your agent</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <div class="wrap">
+    <span class="eyebrow"><span class="dot"></span><span id="eyebrow">Kernel agents, scored end to end</span></span>
+    <h1>Kernel speedups that <span class="grad">survive production</span>.</h1>
+    <p class="lede">
+  Other kernel leaderboards tell you how fast a kernel is in a sandbox.
+      This one tells you how much of that speedup survives into a real inference server,
+      measured against the kernels production frameworks actually ship.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" href="#submit">
+        Submit your agent
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+      </a>
+      <a class="btn btn-ghost btn-lg" href="#leaderboard">View the leaderboard</a>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+</section>
+
+<main class="wrap">
+
+  <section id="leaderboard" class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>End-to-end leaderboard</h2>
+        <p class="sub" id="lb-sub">Each agent's winning kernels, deployed into the default-set models on the production path and scored with MacroEval.</p>
+      </div>
+      <div class="controls">
+        <div class="control">
+          <span class="control-label">Rank by</span>
+          <div class="seg" data-key="metric">
+            <button type="button" data-val="score" aria-pressed="true">Score</button>
+            <button type="button" data-val="speedup" aria-pressed="false">Speedup</button>
+            <button type="button" data-val="correctness" aria-pressed="false">Correctness</button>
+            <button type="button" data-val="coverage" aria-pressed="false">Coverage</button>
+          </div>
+        </div>
+        <div class="control">
+          <span class="control-label">Speedup weighting</span>
+          <div class="seg" data-key="lambda">
+            <button type="button" data-val="blend" aria-pressed="true">Blend</button>
+            <button type="button" data-val="thr" aria-pressed="false">Throughput</button>
+            <button type="button" data-val="lat" aria-pressed="false">Latency</button>
+          </div>
+        </div>
+        <div class="control">
+          <span class="control-label">Mode</span>
+          <div class="seg" data-key="mode">
+            <button type="button" data-val="all" aria-pressed="true">All</button>
+            <button type="button" data-val="ind" aria-pressed="false">Independent</button>
+            <button type="button" data-val="seq" aria-pressed="false">Sequential</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="table-wrap"><table id="t-e2e" class="board"></table></div>
+    <div class="legend">
+      <span><span class="sq ok"></span>Valid model</span>
+      <span><span class="sq low"></span>Runs, below correctness threshold</span>
+      <span><span class="sq fail"></span>No deployable subset found</span>
+      <span class="hint">Click a row for per-family results, drop causes, and ranking robustness.</span>
+    </div>
+  </section>
+
+  <section id="explore" class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Deep dive</h2>
+        <p class="sub">Where the end-to-end numbers come from: every model, every kernel level, and what each campaign cost.</p>
+      </div>
+    </div>
+    <div class="tabs" role="tablist" id="tabs">
+      <button type="button" role="tab" data-tab="models" aria-selected="true">Per model</button>
+      <button type="button" role="tab" data-tab="kernel" aria-selected="false">Kernel level</button>
+      <button type="button" role="tab" data-tab="composition" aria-selected="false">Composition gap</button>
+      <button type="button" role="tab" data-tab="cost" aria-selected="false">Cost &amp; provenance</button>
+      <button type="button" role="tab" data-tab="basemodels" aria-selected="false" hidden>Base models</button>
+    </div>
+
+    <div class="tabpanel" data-panel="models" role="tabpanel">
+      <div class="tab-intro">
+        <p>End-to-end speedup of each agent set on every model, grouped by family. Hatched cells are models where no subset of the agent's kernels ran correctly; switch to <em>as-is</em> to see what happens when every kernel-level winner is swapped in unchanged.</p>
+        <div class="controls">
+          <div class="control">
+            <span class="control-label">Kernel set</span>
+            <div class="seg" data-key="heatView">
+              <button type="button" data-val="dep" aria-pressed="true">Deployable subset</button>
+              <button type="button" data-val="asis" aria-pressed="false">All winners as-is</button>
+            </div>
+          </div>
+          <div class="control">
+            <span class="control-label">Speedup</span>
+            <div class="seg" data-key="heatLambda">
+              <button type="button" data-val="blend" aria-pressed="true">Blend</button>
+              <button type="button" data-val="thr" aria-pressed="false">Thr.</button>
+              <button type="button" data-val="lat" aria-pressed="false">Lat.</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="t-heat" class="heat"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="kernel" role="tabpanel" hidden>
+      <div class="callout" id="kernel-callout"></div>
+      <div class="tab-intro">
+        <p><b>Corr.</b>: operators correct on every captured shape. <b>Geo.</b>: geomean speedup over the correct ones. <b>fast<sub>p</sub></b>: correct and more than <i>p</i>&times; faster than production. <em>Composed</em> activates the agent's own lower-level winners underneath, so it predicts deployment; <em>Independent</em> does not.</p>
+        <div class="control">
+          <span class="control-label">Mode</span>
+          <div class="seg" data-key="kMode">
+            <button type="button" data-val="all" aria-pressed="true">All</button>
+            <button type="button" data-val="ind" aria-pressed="false">Independent</button>
+            <button type="button" data-val="comp" aria-pressed="false">Composed</button>
+            <button type="button" data-val="seq" aria-pressed="false">Sequential</button>
+          </div>
+        </div>
+      </div>
+      <div class="table-wrap"><table id="t-kernel" class="kern"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="composition" role="tabpanel" hidden>
+      <div class="tab-intro">
+        <p>What an agent loses when its own kernels sit underneath each other (<em>Independent &rarr; Composed</em>), and what regenerating on top of frozen lower-level winners buys back (<em>Composed &rarr; Sequential</em>). Ratios are paired over the operators correct in both modes (<i>n</i>); <b>Broke</b> counts independent winners that fail correctness once composed.</p>
+      </div>
+      <div class="table-wrap"><table id="t-comp"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="cost" role="tabpanel" hidden>
+      <div class="cost-grid" id="cost-charts"></div>
+      <p class="fine">Agent-hours sum each operator's wall-clock generation time, including relaunches; operators run in parallel, so this is not campaign wall-clock time. Tokens include input, output (with reasoning), and cached context.</p>
+      <h3 style="margin:24px 0 4px;font-size:1.02rem">Provenance</h3>
+      <p class="sub" style="margin-bottom:10px">The run directory behind each agent, and the SHA-256 of the bench JSONs its kernel-level numbers were computed from.</p>
+      <div class="table-wrap"><table id="t-prov"></table></div>
+    </div>
+
+    <div class="tabpanel" data-panel="basemodels" role="tabpanel" hidden>
+      <div class="table-wrap"><table id="t-models"></table></div>
+    </div>
+  </section>
+
+  <section id="scoring" class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>How scoring works</h2>
+        <p class="sub">MacroEval, as defined in the FastKernels paper. The kernel-level bench gives agents fast feedback; the end-to-end run is the ground truth this leaderboard reports.</p>
+      </div>
+    </div>
+    <div class="formula">
+      <span>Score</span><span class="op">=</span>
+      <span class="t">S<sub>macro</sub></span><span class="op">&times;</span>
+      <span class="t">C<sub>macro</sub></span><span class="op">&times;</span>
+      <span class="t">Coverage<sub>macro</sub></span>
+    </div>
+    <div class="metric-cards">
+      <div class="mcard" style="--mc: var(--accent)">
+        <h3>Speedup &middot; S<sub>macro</sub></h3>
+        <p>Throughput and latency speedups over the production kernels, blended geometrically (&lambda; = <span data-bind="lambda">0.5</span>), averaged over the valid models in each family, then across families.</p>
+      </div>
+      <div class="mcard" style="--mc: var(--pos)">
+        <h3>Correctness &middot; C<sub>macro</sub></h3>
+        <p>Each model's output discrepancy (tokens, embeddings, IoU, trajectories, &hellip;) mapped to [0,&nbsp;1]: full credit below the model's own noise floor, none once the output is half as far off as an unrelated one.</p>
+      </div>
+      <div class="mcard" style="--mc: var(--warn)">
+        <h3>Coverage<sub>macro</sub></h3>
+        <p>Share of models whose correctness clears &tau; = <span data-bind="tau">0.9</span>. Crashes, hangs, NaNs, and wrong outputs are invalid and earn no speedup credit.</p>
+      </div>
+    </div>
+    <ol class="pipeline">
+      <li><b>Capture</b>Real workloads record every operator's shapes on the production path.</li>
+      <li><b>Kernel bench</b>Each candidate vs. the production kernel on captured cases, in an isolated process.</li>
+      <li><b>Winner gate</b>Every case correct and a geomean speedup of at least 1&times;.</li>
+      <li><b>Deploy</b>Winners swapped into all <span data-bind="nModels">11</span> models; kernels that crash or corrupt a model are dropped and the model re-run.</li>
+      <li><b>MacroEval</b>Scored against a same-session baseline and a noise run that calibrates each model's threshold.</li>
+    </ol>
+  </section>
+
+  <section id="submit" class="submit">
+    <div class="submit-head">
+      <span class="eyebrow"><span class="dot"></span>Open for submissions</span>
+      <h2>Put your agent on the board</h2>
+      <p class="sub">
+        Any agent that writes candidate kernel files can be scored with the same harness.
+        You send the kernels; we run them through the same pipeline on the same hardware as every
+        other row, so no number on this page is self-reported.
+      </p>
+    </div>
+    <div class="submit-grid">
+      <ol class="steps">
+        <li class="step">
+          <div class="step-num">1</div>
+          <div>
+            <h3>Install FastKernels</h3>
+            <p>One Python package gives you the tasks, the production baselines, and both evaluation tiers.</p>
+            <div class="code">
+              <div class="bar-top"><span>bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code><span class="pr">$ </span>git clone <span data-bind="repoGit">https://github.com/Snowflake-AI-Research/fastkernels.git</span>
+<span class="pr">$ </span>cd fastkernels &amp;&amp; pip install -e .</code></pre>
+            </div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">2</div>
+          <div>
+            <h3>Generate candidate kernels</h3>
+            <p>Every task is a production <code>nn.Module</code>. Scaffold stubs with the baselines' class names and <code>__init__</code>/<code>forward</code> signatures, then let your agent fill them in. Candidates live in <code>fastkernels/tasks/candidate/L1&hellip;L3/</code>, or anywhere you point <code>FASTKERNELS_CANDIDATE_DIR</code>.</p>
+            <div class="code">
+              <div class="bar-top"><span>bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code><span class="pr">$ </span>fastkernels create-stubs --level 1
+<span class="cm"># your agent writes fastkernels/tasks/candidate/L1/rms_norm.py:</span>
+<span class="cm">#   class RMSNorm(nn.Module) with the baseline's __init__ / forward</span></code></pre>
+            </div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">3</div>
+          <div>
+            <h3>Check it locally</h3>
+            <p>Capture the default set's real shapes once, then bench each kernel in isolation against the production kernel. Optionally, run the full end-to-end MacroEval on your set.</p>
+            <div class="code">
+              <div class="bar-top"><span>bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code><span class="pr">$ </span>fastkernels capture default --output ~/.fastkernels/captures/default
+<span class="pr">$ </span>fastkernels bench --standalone --captures ~/.fastkernels/captures/default
+<span class="cm"># optional: end-to-end MacroEval of a candidate set</span>
+<span class="pr">$ </span>fastkernels e2e default --sets ./my-agent-ind --out ./e2e-out</code></pre>
+            </div>
+          </div>
+        </li>
+        <li class="step">
+          <div class="step-num">4</div>
+          <div>
+            <h3>Open a submission</h3>
+            <p>Open a pre-filled GitHub issue with a link to your candidate set(s) and a few details about your agent. That's it: we take it from there and publish your row.</p>
+            <a class="btn btn-primary" data-submit-link href="#" target="_blank" rel="noopener">
+              Open a submission issue
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </a>
+          </div>
+        </li>
+      </ol>
+
+      <aside class="submit-card">
+        <h3>What to include</h3>
+        <ul class="checklist">
+          <li><span><b>Independent set</b>: kernels for the default set's L1&ndash;L3 operators (<span data-bind="targets">132 targets</span>), each generated against production lower-level kernels.</span></li>
+          <li class="opt"><span><b>Sequential set</b><span class="tag">optional</span>: L2&ndash;L3 regenerated on top of your frozen lower-level winners. It gets its own row.</span></li>
+          <li><span><b>About your agent</b>: name, base model(s), and a link to code or a write-up.</span></li>
+          <li class="opt"><span><b>Cost</b><span class="tag">optional</span>: agent-hours and tokens, shown in the Cost column.</span></li>
+        </ul>
+        <a class="btn btn-primary btn-lg btn-block" data-submit-link href="#" target="_blank" rel="noopener">Open a submission issue</a>
+        <div class="next">
+          <h4>What happens next</h4>
+          <ol>
+            <li>We bench every kernel on captured production shapes and keep the winners.</li>
+            <li>Winners are deployed into all <span data-bind="nModels">11</span> models on <span data-bind="hardware">8&times; NVIDIA B200</span>, with drop-and-retry for kernels that break a model.</li>
+            <li>Your row is published with its MacroEval score and the SHA-256 of the results it came from.</li>
+          </ol>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="faq" class="panel">
+    <div class="panel-head"><div><h2>FAQ</h2></div></div>
+    <div class="faq" id="faq-list">
+      <details>
+        <summary>Do I need 8&times; B200 to submit?</summary>
+        <p>No. You need a GPU to iterate with <code>fastkernels bench</code>, and capturing the largest default-set models (up to TP&nbsp;4) needs a multi-GPU node. Your local numbers are for your own feedback: every number on the leaderboard is measured by the maintainers on locked-clock B200s, against a baseline run in the same session.</p>
+      </details>
+      <details>
+        <summary>What counts as a winning kernel?</summary>
+        <p>A candidate becomes a winner only if every benchmarked case passes correctness and its geometric-mean speedup over the production kernel is at least 1&times;. Only winners are deployed end to end; an unchanged baseline counts as correct at 1&times; but not as a win.</p>
+      </details>
+      <details>
+        <summary>What are the independent, composed, and sequential modes?</summary>
+        <p><em>Independent</em> generates and benches each operator on top of production lower-level kernels. <em>Composed</em> activates all independent winners together, so higher-level kernels run on the agent's own lower-level ones. <em>Sequential</em> regenerates L2 and L3 on top of the frozen lower-level winners. Independent and sequential sets are each deployed end to end.</p>
+      </details>
+      <details>
+        <summary>What happens when a kernel breaks a model?</summary>
+        <p>The offending kernel (named in the traceback, or found by bisection) is dropped and the model is re-run. The first subset that runs correctly is the <em>deployable subset</em>, which is what the leaderboard scores. <b>Kept</b> shows how many requested kernels survived, and <b>As-is</b> shows on how many models the unmodified winner set already ran correctly.</p>
+      </details>
+      <details>
+        <summary>How are reward hacks caught?</summary>
+        <p>Each operator is benched in its own process against the production kernel on shared weights, with checks for patched timers, background threads injected during timing, lazily materialized outputs, and patched benchmark helpers. The end-to-end run then checks correctness on the model's real outputs, which catches kernels that pass every unit check yet corrupt the model.</p>
+      </details>
+      <details>
+        <summary>Why rank by a product of three metrics?</summary>
+        <p>The default score rewards agents that are fast, correct, and broadly applicable at the same time. Use <b>Rank by</b> to rank on any single axis, and <b>Speedup weighting</b> for throughput-only (&lambda;&nbsp;=&nbsp;1) or latency-only (&lambda;&nbsp;=&nbsp;0) deployments. Each row's details show its rank when the correctness thresholds are halved or doubled.</p>
+      </details>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div id="foot-env"></div>
+    <div class="foot-links">
+      <a href="../">Project page</a>
+      <a href="https://arxiv.org/abs/2605.23215">Paper</a>
+      <a href="leaderboard.json">leaderboard.json</a>
+      <a href="README.md">Static tables</a>
+      <a data-repo-link href="#" target="_blank" rel="noopener">FastKernels on GitHub</a>
+    </div>
+  </div>
+</footer>
+
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const REPO = 'https://github.com/Snowflake-AI-Research/fastkernels';
+
+const AGENT_STYLE = {
+  drkernel: { color: '#8b5cf6', mono: 'DK' },
+  claude:   { color: '#f97316', mono: 'CC' },
+  kda:      { color: '#3b82f6', mono: 'KDA' },
+  ako:      { color: '#14b8a6', mono: 'AKO' },
+  codex:    { color: '#ec4899', mono: 'CX' },
+};
+const FAMILY_SHORT = {
+  'Dense & MoE LLMs': 'LLMs',
+  'Linear Attention & New Archs': 'Linear attn.',
+  'Vision / Video / Audio': 'Vision',
+  'Multimodal & Encoders': 'Multimodal',
+  'Edge & Detection': 'Edge',
+  '3D / Robotics / Science': 'Science',
+  'Recommendation & Specialized': 'RecSys',
+  'World Models': 'World',
+};
+const DROP_LABELS = {
+  compile: 'Breaks compile stack', runtime: 'Crashes at run time', timeout: 'Hangs',
+  import: 'Fails to import', incorrect: 'Wrong outputs',
+};
+const OUTCOME_LABELS = { crash: 'crash', broken: 'wrong outputs', incomplete: 'no deployable subset', timeout: 'timeout' };
+const LAMBDA_LABELS = { blend: '\u03bb = 0.5', thr: 'throughput', lat: 'latency' };
+const METRIC_LABELS = { score: 'Score', speedup: 'Speedup', correctness: 'Correctness', coverage: 'Coverage' };
+const LEVELS = ['L1', 'L2', 'L3'];
+
+const state = {
+  metric: 'score', lambda: 'blend', mode: 'all', open: new Set(),
+  heatView: 'dep', heatLambda: 'blend', kMode: 'all',
+};
+let DATA = null;
+
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const NIL = '<span class="nil">&mdash;</span>';
+const num = (v, d = 2) => (v == null ? NIL : v.toFixed(d));
+const times = (v, d = 2) => (v == null ? NIL : v.toFixed(d) + '&times;');
+const pct = (v) => (v == null ? NIL : Math.round(100 * v) + '%');
+const sum = (xs) => xs.reduce((a, b) => a + (b || 0), 0);
+const tokens = (v) => {
+  if (v == null) return null;
+  if (v >= 1e9) return (v / 1e9).toFixed(v >= 1e10 ? 1 : 2) + 'B';
+  if (v >= 1e6) return Math.round(v / 1e6) + 'M';
+  return v.toLocaleString('en-US');
+};
+const hours = (v) => (v == null ? null : Math.round(v).toLocaleString('en-US') + ' h');
+
+function agentStyle(key, name) {
+  if (AGENT_STYLE[key]) return AGENT_STYLE[key];
+  let h = 0;
+  for (const ch of key || name) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const words = name.split(/\s+/).filter(Boolean);
+  const mono = words.length > 1 ? words.map((w) => w[0]).join('').slice(0, 2) : name.slice(0, 3);
+  return { color: `hsl(${h} 70% 55%)`, mono: mono.toUpperCase() };
+}
+function avatar(r, small = false) {
+  const s = agentStyle(r.agent_key, r.agent);
+  return `<span class="avatar${small ? ' sm' : ''}" style="--c:${s.color}">${esc(s.mono)}</span>`;
+}
+function agentCell(r, { chevron = false, compact = false } = {}) {
+  const info = (DATA.agent_info || {})[r.agent_key] || {};
+  const kind = compact ? info.kind : [info.kind, info.models].filter(Boolean).join(' \u00b7 ');
+  const tip = compact && info.models ? ` data-tip="${esc(`<b>${esc(r.agent)}</b><br>${esc(info.models)}`)}"` : '';
+  return `<div class="agent">${avatar(r)}<div>` +
+    `<div class="agent-name"${tip}>${esc(r.agent)}${chevron ? '<span class="chev">&#9656;</span>' : ''}</div>` +
+    (kind ? `<div class="agent-kind${compact ? ' nw' : ''}">${esc(kind)}</div>` : '') + '</div></div>';
+}
+const modePill = (r) => `<span class="mode mode-${r.mode}">${esc(r.mode_label)}</span>`;
+
+function chip(v, d = 2, extra = '') {
+  if (v == null) return NIL;
+  const cls = v >= 2 ? 'pos2' : v > 1.005 ? 'pos' : v < 0.995 ? 'neg' : 'neu';
+  return `<span class="chip ${cls}${extra ? ' ' + extra : ''}">${v.toFixed(d)}&times;</span>`;
+}
+function heat(v, span = 1.6) {
+  const t = Math.max(-1, Math.min(1, Math.log(v) / Math.log(span)));
+  const a = Math.round(6 + 49 * Math.abs(t));
+  return `color-mix(in oklab, var(${t >= 0 ? '--pos' : '--neg'}) ${a}%, transparent)`;
+}
+
+/* ---------------- hero ---------------- */
+function renderHero() {
+  const rows = DATA.boards.agents.rows;
+  const e2e = rows.filter((r) => r.e2e && r.e2e.deployable);
+  const u = DATA.universe || {};
+  const env = DATA.environment || {};
+  const nAgents = new Set(rows.map((r) => r.agent_key)).size;
+
+  let kMax = null;
+  for (const r of rows) for (const L of LEVELS) {
+    const g = r.kernel[L] && r.kernel[L].geomean;
+    if (g != null && (kMax == null || g > kMax.v)) kMax = { v: g, r, L };
+  }
+  const sBest = e2e.reduce((b, r) => (!b || r.e2e.deployable.S_macro.blend > b.e2e.deployable.S_macro.blend ? r : b), null);
+  const asIs = e2e.map((r) => r.e2e.all_winners && r.e2e.all_winners.coverage_macro).filter((v) => v != null);
+  const campaigns = rows.filter((r) => r.mode !== 'comp' && r.cost);
+  const totalHours = sum(campaigns.map((r) => r.cost.agent_hours));
+  const totalTokens = sum(campaigns.map((r) => r.cost.tokens));
+
+  $('#eyebrow').textContent =
+    `${nAgents} agents \u00b7 ${u.n_models || '?'} models \u00b7 ${env.gpu_count || '?'}\u00d7 ${env.gpu || 'GPU'}`;
+
+  const cards = [];
+  if (kMax && sBest) cards.push({
+    big: `${kMax.v.toFixed(1)}&times;<span class="arrow">&rarr;</span>${sBest.e2e.deployable.S_macro.blend.toFixed(2)}&times;`,
+    label: 'Best kernel-level speedup vs. best end-to-end speedup',
+    tip: `<b>${esc(kMax.r.agent)}</b> ${esc(kMax.r.mode_label)} ${kMax.L}: ${kMax.v.toFixed(2)}&times; geomean over its correct kernels.<br><b>${esc(sBest.agent)}</b> ${esc(sBest.mode_label)}: ${sBest.e2e.deployable.S_macro.blend.toFixed(2)}&times; S<sub>macro</sub> end to end.`,
+  });
+  if (asIs.length) cards.push({
+    big: `${Math.round(100 * Math.min(...asIs))}&ndash;${Math.round(100 * Math.max(...asIs))}%`,
+    label: 'of model families on which an agent\u2019s winning kernels run correctly as-is',
+    tip: 'Macro coverage when every kernel-level winner is swapped in unchanged, before drop-and-retry.',
+  });
+  cards.push({
+    big: `${u.n_models || '?'} models`,
+    label: `${u.n_families || '?'} families, served with torch.compile, CUDA graphs, and tensor parallelism`,
+    tip: (u.models || []).map((m) => esc(m.label)).join(' \u00b7 '),
+  });
+  if (totalHours) cards.push({
+    big: hours(totalHours),
+    label: `of agent time and ${tokens(totalTokens)} tokens behind the ${nAgents} seeded agents`,
+    tip: 'Summed over the independent and sequential campaigns of every agent.',
+  });
+  $('#stats').innerHTML = cards.map((c) =>
+    `<div class="stat" data-tip="${esc(c.tip)}"><div class="stat-big">${c.big}</div><div class="stat-label">${c.label}</div></div>`).join('');
+}
+
+/* ---------------- leaderboard ---------------- */
+function metricValue(r) {
+    const d = r.e2e.deployable;
+  switch (state.metric) {
+    case 'speedup': return d.S_macro[state.lambda];
+    case 'correctness': return d.C_macro;
+    case 'coverage': return d.coverage_macro;
+    default: return d.score[state.lambda];
+  }
+}
+function e2eRows() {
+  return DATA.boards.agents.rows.filter((r) => r.e2e && r.e2e.deployable);
+}
+function rankedE2E() {
+  const rows = e2eRows().filter((r) => state.mode === 'all' || r.mode === state.mode);
+  return rows.sort((a, b) => (metricValue(b) - metricValue(a)) ||
+    (b.e2e.deployable.score.blend - a.e2e.deployable.score.blend));
+}
+
+function modelTip(m) {
+  const lam = state.lambda;
+  let dep;
+  if (m.valid) {
+    dep = `<span class="tp-pos">valid</span>, ${m.s[lam].toFixed(2)}&times; <span class="tp-mut">(thr ${m.s.thr.toFixed(2)}&times; \u00b7 lat ${m.s.lat.toFixed(2)}&times;)</span>`;
+  } else if (m.outcome === 'ok') {
+    dep = `<span class="tp-warn">below threshold</span> (C = ${m.C.toFixed(2)})`;
+  } else {
+    dep = `<span class="tp-neg">${esc(OUTCOME_LABELS[m.outcome] || m.outcome)}</span>`;
+  }
+  const a = m.as_is || {};
+  const asis = a.valid ? '<span class="tp-pos">runs correctly</span>'
+    : a.outcome === 'ok' ? '<span class="tp-warn">below threshold</span>'
+    : `<span class="tp-neg">${esc(OUTCOME_LABELS[a.outcome] || a.outcome || 'n/a')}</span>${a.detail ? ` <span class="tp-mut">(${esc(a.detail)})</span>` : ''}`;
+  const dropped = m.n_dropped ? `${m.n_dropped} kernel${m.n_dropped === 1 ? '' : 's'} dropped` : 'no kernels dropped';
+  return `<b>${esc(m.label)}</b> <span class="tp-mut">${esc(m.family)}</span><br>` +
+    `Deployable: ${dep}<br>` +
+    `${m.valid ? `C = ${m.C.toFixed(2)} \u00b7 ` : ''}${dropped}<br>All winners as-is: ${asis}`;
+}
+function sqClass(valid, outcome) {
+  return valid ? 'ok' : outcome === 'ok' ? 'low' : 'fail';
+}
+function strip(r) {
+  return '<div class="strip">' + r.e2e.per_model.map((m) =>
+    `<span class="sq ${sqClass(m.valid, m.outcome)}" data-tip="${esc(modelTip(m))}"></span>`).join('') + '</div>';
+}
+
+function detailRow(r, ncols) {
+  const d = r.e2e.deployable, dr = r.e2e.drops || {}, sens = r.e2e.sensitivity || {};
+  const info = (DATA.agent_info || {})[r.agent_key] || {};
+  const c = r.cost || {};
+  const lam = state.lambda;
+
+  const campaign = [
+    c.n_ops != null ? `${c.n_ops} operators` : null,
+    c.agent_hours != null ? `${hours(c.agent_hours)}` : null,
+    c.tokens != null ? `${tokens(c.tokens)} tokens` : null,
+    c.median_hours_per_op != null ? `median ${c.median_hours_per_op.toFixed(1)} h per operator` : null,
+  ].filter(Boolean).join(' \u00b7 ');
+  const agentCard = `<div class="dcard"><h4>Agent</h4>` +
+    `<p><b>${esc(info.kind || r.agent)}</b></p><dl>` +
+    (info.models ? `<dt>Model</dt><dd>${esc(info.models)}</dd>` : '') +
+    (info.loop ? `<dt>Loop</dt><dd>${esc(info.loop)}</dd>` : '') +
+    (campaign ? `<dt>Campaign</dt><dd>${esc(campaign)}</dd>` : '') + '</dl></div>';
+
+  const famRows = (DATA.universe.families || []).map((fam) => {
+    const x = (d.families || {})[fam];
+    if (!x) return '';
+    const s = x.S_f && x.S_f[lam];
+    return `<tr><td class="l" title="${esc(fam)}">${esc(FAMILY_SHORT[fam] || fam)}</td>` +
+      `<td>${x.n_valid}/${x.n}</td><td>${num(x.C_f)}</td><td>${s == null ? NIL : chip(s)}</td></tr>`;
+  }).join('');
+  const famCard = `<div class="dcard"><h4>Per family</h4><table class="mini"><thead><tr>` +
+    `<th class="l">Family</th><th>Valid</th><th>C<sub>f</sub></th><th>S<sub>f</sub></th></tr></thead>` +
+    `<tbody>${famRows}</tbody></table></div>`;
+
+  const cats = Object.entries(dr.dropped_by_category || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  const catMax = Math.max(1, ...cats.map(([, n]) => n));
+  const dropCard = `<div class="dcard"><h4>Deployability</h4>` +
+    `<div class="hbar kept"><span>Kept ${dr.kept ?? '?'} of ${dr.requested ?? '?'} kernels</span><b>${pct(dr.kept_fraction)}</b>` +
+    `<span class="track"><i style="width:${100 * (dr.kept_fraction || 0)}%"></i></span></div>` +
+    (cats.length ? cats.map(([k, n]) =>
+      `<div class="hbar"><span>${esc(DROP_LABELS[k] || k)}</span><b>${n}</b>` +
+      `<span class="track"><i style="width:${100 * n / catMax}%"></i></span></div>`).join('')
+      : '<p class="fine">No kernels dropped.</p>') + '</div>';
+
+  const scales = [['0.5x', '\u00bd\u00d7'], ['1x', '1\u00d7'], ['2x', '2\u00d7']];
+  const of = (sens['1x'] || {}).of;
+  const robustCard = `<div class="dcard"><h4>Robustness</h4>` +
+    `<p style="font-size:.82rem;color:var(--muted)">Rank when the correctness thresholds are scaled${of ? ` (of ${of} sets)` : ''}.</p>` +
+    `<div class="ranks">${scales.map(([k, lab]) =>
+      `<div><b>${sens[k] ? '#' + sens[k].rank : '\u2014'}</b><span>${lab} thresholds</span></div>`).join('')}</div></div>`;
+
+  return `<tr class="detail"><td colspan="${ncols}"><div class="detail-grid">` +
+    agentCard + famCard + dropCard + robustCard + '</div></td></tr>';
+}
+
+function renderBoard() {
+  const rows = rankedE2E();
+  const lam = state.lambda;
+  const maxScore = Math.max(...rows.map((r) => r.e2e.deployable.score[lam]), 1e-9);
+  const u = DATA.universe || {};
+  const act = (m) => (state.metric === m ? ' active' : '');
+
+  $('#lb-sub').innerHTML =
+    `Each agent's winning kernels, deployed into the ${u.n_models} default-set models (${u.n_families} families) ` +
+    `on the production path. Ranked by <b>${METRIC_LABELS[state.metric]}</b>` +
+    (state.metric === 'score' || state.metric === 'speedup' ? ` with speedup weighted by <b>${LAMBDA_LABELS[lam]}</b>` : '') + '.';
+
+  const head = '<thead><tr>' +
+    '<th class="c">#</th><th class="l">Agent</th><th class="l">Mode</th>' +
+    `<th class="sort${act('score')}" data-sort="score" data-tip="S<sub>macro</sub> &times; C<sub>macro</sub> &times; Coverage<sub>macro</sub>">Score</th>` +
+    `<th class="sort${act('speedup')}" data-sort="speedup" data-tip="S<sub>macro</sub>: macro-geomean end-to-end speedup over the production kernels on valid models. Sub-line: throughput-only and latency-only.">Speedup</th>` +
+    `<th class="sort${act('correctness')}" data-sort="correctness" data-tip="C<sub>macro</sub>: calibrated correctness in [0, 1], averaged per family, then across families.">Correctness</th>` +
+    `<th class="sort${act('coverage')}" data-sort="coverage" data-tip="Coverage<sub>macro</sub>: share of models with C<sub>i</sub> &ge; &tau;, averaged per family, then across families.">Coverage</th>` +
+    `<th class="l" data-tip="One square per model, grouped by family. Hover a square for its speedup, correctness, and dropped kernels.">Models</th>` +
+    `<th data-tip="Share of requested (model, kernel) pairs that survived drop-and-retry.">Kept</th>` +
+    `<th data-tip="Models on which the full winner set runs correctly with no kernel dropped.">As-is</th>` +
+    `<th data-tip="Tokens and agent-hours of the campaign that produced this set.">Cost</th>` +
+    '</tr></thead>';
+
+  const ncols = 11;
+  const body = rows.map((r, i) => {
+    const d = r.e2e.deployable, aw = r.e2e.all_winners, dr = r.e2e.drops || {}, c = r.cost || {};
+    const key = `${r.agent_key}-${r.mode}`;
+    const open = state.open.has(key);
+    const sc = d.score[lam];
+    const rank = i + 1;
+    const lead = rank === 1 && state.metric === 'score';
+    const main = `<tr class="row${open ? ' open' : ''}${lead ? ' lead' : ''}" data-key="${esc(key)}" tabindex="0" aria-expanded="${open}">` +
+      `<td class="c"><span class="rank${rank <= 3 ? ' r' + rank : ''}">${rank}</span></td>` +
+      `<td class="l">${agentCell(r, { chevron: true, compact: true })}</td>` +
+      `<td class="l">${modePill(r)}</td>` +
+      `<td class="${act('score')}"><div class="score"><b>${num(sc)}</b><span class="bar"><i style="width:${Math.max(2, 100 * sc / maxScore)}%"></i></span></div></td>` +
+      `<td class="${act('speedup')}">${chip(d.S_macro[lam])}<div class="subv">thr ${times(d.S_macro.thr)} \u00b7 lat ${times(d.S_macro.lat)}</div></td>` +
+      `<td class="${act('correctness')}"><b>${num(d.C_macro)}</b></td>` +
+      `<td class="${act('coverage')}"><b>${num(d.coverage_macro)}</b><div class="subv">${d.n_valid}/${d.n_items} valid</div></td>` +
+      `<td class="l">${strip(r)}</td>` +
+      `<td><b>${pct(dr.kept_fraction)}</b><div class="subv">${dr.kept ?? '?'}/${dr.requested ?? '?'}</div></td>` +
+      `<td>${aw ? `<b>${aw.n_valid}/${aw.n_items}</b><div class="subv">models</div>` : NIL}</td>` +
+      `<td>${c.tokens != null ? `<b>${tokens(c.tokens)}</b><div class="subv">${hours(c.agent_hours) || ''}</div>` : NIL}</td>` +
+      '</tr>';
+    return main + (open ? detailRow(r, ncols) : '');
+  }).join('');
+
+  $('#t-e2e').innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+
+/* ---------------- per-model heatmap ---------------- */
+function renderHeat() {
+  const rows = e2eRows().slice().sort((a, b) => b.e2e.deployable.score.blend - a.e2e.deployable.score.blend);
+  const models = (DATA.universe && DATA.universe.models) || [];
+  const groups = [];
+  for (const m of models) {
+    const g = groups[groups.length - 1];
+    if (g && g.family === m.family) g.n++; else groups.push({ family: m.family, n: 1 });
+  }
+  const lam = state.heatLambda;
+  const asis = state.heatView === 'asis';
+  $$('.seg[data-key="heatLambda"] button').forEach((b) => { b.disabled = asis; });
+
+  const head = '<thead><tr><th class="l" rowspan="2">Agent set</th>' +
+    groups.map((g) => `<th class="fam" colspan="${g.n}" title="${esc(g.family)}">${esc(FAMILY_SHORT[g.family] || g.family)}</th>`).join('') +
+    '</tr><tr>' + models.map((m) => `<th class="mdl">${esc(m.label)}</th>`).join('') + '</tr></thead>';
+
+  const body = rows.map((r) => {
+    const byModel = Object.fromEntries(r.e2e.per_model.map((m) => [m.model, m]));
+    const cells = models.map((mm) => {
+      const m = byModel[mm.id];
+      if (!m) return `<td class="hc">${NIL}</td>`;
+      const tip = esc(modelTip(m));
+      if (asis) {
+        const a = m.as_is || {};
+        if (a.valid) return `<td class="hc okas" data-tip="${tip}">runs</td>`;
+        if (a.outcome === 'ok') return `<td class="hc low" data-tip="${tip}">C&lt;&tau;</td>`;
+        return `<td class="hc fail" data-tip="${tip}">${esc(a.outcome === 'broken' ? 'wrong' : (a.outcome || '?'))}</td>`;
+      }
+      const s = m.s && m.s[lam];
+      if (m.valid && s != null) return `<td class="hc" style="background:${heat(s)}" data-tip="${tip}">${s.toFixed(2)}</td>`;
+      if (m.outcome === 'ok') return `<td class="hc low" data-tip="${tip}">${s != null ? s.toFixed(2) : ''}<small>C&lt;&tau;</small></td>`;
+      return `<td class="hc fail" data-tip="${tip}">n.c.</td>`;
+    }).join('');
+    return `<tr><th class="l"><div class="set-label">${avatar(r, true)}<span>${esc(r.agent)}</span><span class="m">${r.mode === 'seq' ? 'Seq.' : 'Ind.'}</span></div></th>${cells}</tr>`;
+  }).join('');
+  $('#t-heat').innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+
+/* ---------------- kernel level ---------------- */
+function renderKernel() {
+  const t = DATA.targets_per_level || {};
+  const all = DATA.boards.agents.rows;
+  const rows = all.filter((r) => state.kMode === 'all' || r.mode === state.kMode);
+
+  const best = {};
+  for (const L of LEVELS) {
+    best[L] = { correct: null, geomean: null };
+    for (const r of rows) {
+      const k = r.kernel[L];
+      if (!k) continue;
+      if (k.correct != null && (best[L].correct == null || k.correct > best[L].correct)) best[L].correct = k.correct;
+      if (k.geomean != null && (best[L].geomean == null || k.geomean > best[L].geomean)) best[L].geomean = k.geomean;
+    }
+  }
+
+  const head = '<thead><tr><th class="l" rowspan="2">Agent</th><th class="l" rowspan="2">Mode</th>' +
+    LEVELS.map((L) => `<th class="lvl lv-start" colspan="4">${L} <span style="font-weight:500;text-transform:none;letter-spacing:0">(${t[L.slice(1)] ?? '?'} targets)</span></th>`).join('') +
+    '</tr><tr>' + LEVELS.map(() =>
+      '<th class="lv-start">Corr.</th><th>Geo.</th><th>fast<sub>1</sub></th><th>fast<sub>2</sub></th>').join('') + '</tr></thead>';
+
+  const order = [];
+  const byAgent = {};
+  for (const r of rows) {
+    if (!byAgent[r.agent_key]) { byAgent[r.agent_key] = []; order.push(r.agent_key); }
+    byAgent[r.agent_key].push(r);
+  }
+  const body = order.map((key) => byAgent[key].map((r, i) => {
+    const cells = LEVELS.map((L) => {
+      const k = r.kernel[L];
+      const total = t[L.slice(1)];
+      if (!k) return `<td class="lv-start">${NIL}</td><td>${NIL}</td><td>${NIL}</td><td>${NIL}</td>`;
+      const isBestC = k.correct != null && k.correct === best[L].correct;
+      const isBestG = k.geomean != null && k.geomean === best[L].geomean;
+      return `<td class="lv-start"><div class="corr"><span><b class="${isBestC ? 'best' : ''}">${k.correct ?? '\u2014'}</b><span class="of">/${total ?? '?'}</span></span>` +
+        `<span class="mbar"><i style="width:${total ? 100 * (k.correct || 0) / total : 0}%"></i></span></div></td>` +
+        `<td>${chip(k.geomean, 2, isBestG ? 'is-best' : '')}</td>` +
+        `<td class="fp">${k.fast_1 ?? NIL}</td><td class="fp">${k.fast_2 ?? NIL}</td>`;
+    }).join('');
+    const agentTd = i === 0 ? `<td class="l agent-cell" rowspan="${byAgent[key].length}">${agentCell(r)}</td>` : '';
+    return `<tr class="${i === 0 ? 'grp-start' : ''}">${agentTd}<td class="l">${modePill(r)}</td>${cells}</tr>`;
+  }).join('')).join('');
+  $('#t-kernel').innerHTML = head + '<tbody>' + body + '</tbody>';
+
+  let kMax = null;
+  for (const r of all) for (const L of LEVELS) {
+    const g = r.kernel[L] && r.kernel[L].geomean;
+    if (g != null && (!kMax || g > kMax.v)) kMax = { v: g, r, L };
+  }
+  const sMax = Math.max(...e2eRows().map((r) => r.e2e.deployable.S_macro.blend));
+  if (kMax) {
+    $('#kernel-callout').innerHTML =
+      `<span><b>Kernel-level speedups do not predict deployment.</b> The best kernel-level geomean here is ` +
+      `${kMax.v.toFixed(2)}&times; (${esc(kMax.r.agent)}, ${esc(kMax.r.mode_label.toLowerCase())} ${kMax.L}); ` +
+      `the best end-to-end speedup any agent's deployable set reaches is ${sMax.toFixed(2)}&times;. ` +
+      `<a href="#leaderboard">See the end-to-end ranking</a>.</span>`;
+  }
+}
+
+/* ---------------- composition ---------------- */
+function renderComposition() {
+  const seen = new Set();
+  const agents = DATA.boards.agents.rows.filter((r) => (seen.has(r.agent_key) ? false : seen.add(r.agent_key)));
+  const ratio = (v) => (v && v.ratio != null ? chip(v.ratio) : NIL);
+  const n = (v) => (v && v.n != null ? `<span class="fp">${v.n}</span>` : NIL);
+  const broke = (v) => {
+    if (!v || v.broke == null) return NIL;
+    return `<span class="broke ${v.broke > 0 ? 'bad' : 'none'}">${v.broke}</span>`;
+  };
+  const head = '<thead><tr><th class="l" rowspan="2">Agent</th>' +
+    '<th class="lvl lv-start" colspan="3" style="text-align:center">Independent &rarr; Composed &middot; L2</th>' +
+    '<th class="lvl lv-start" colspan="3" style="text-align:center">Independent &rarr; Composed &middot; L3</th>' +
+    '<th class="lvl lv-start" colspan="2" style="text-align:center">Composed &rarr; Sequential &middot; L2</th>' +
+    '<th class="lvl lv-start" colspan="2" style="text-align:center">Composed &rarr; Sequential &middot; L3</th></tr><tr>' +
+    '<th class="lv-start"><i>n</i></th><th>Ratio</th><th>Broke</th>' +
+    '<th class="lv-start"><i>n</i></th><th>Ratio</th><th>Broke</th>' +
+    '<th class="lv-start"><i>n</i></th><th>Ratio</th>' +
+    '<th class="lv-start"><i>n</i></th><th>Ratio</th></tr></thead>';
+  const body = agents.map((r) => {
+    const c = r.composition || {};
+    return `<tr><td class="l">${agentCell(r)}</td>` +
+      `<td class="lv-start">${n(c.ind_to_comp_L2)}</td><td>${ratio(c.ind_to_comp_L2)}</td><td>${broke(c.ind_to_comp_L2)}</td>` +
+      `<td class="lv-start">${n(c.ind_to_comp_L3)}</td><td>${ratio(c.ind_to_comp_L3)}</td><td>${broke(c.ind_to_comp_L3)}</td>` +
+      `<td class="lv-start">${n(c.comp_to_seq_L2)}</td><td>${ratio(c.comp_to_seq_L2)}</td>` +
+      `<td class="lv-start">${n(c.comp_to_seq_L3)}</td><td>${ratio(c.comp_to_seq_L3)}</td></tr>`;
+  }).join('');
+  const t = $('#t-comp');
+  t.classList.add('kern');
+  t.innerHTML = head + '<tbody>' + body + '</tbody>';
+}
+
+/* ---------------- cost & provenance ---------------- */
+function renderCost() {
+  const rows = DATA.boards.agents.rows;
+  const agents = [];
+  const by = {};
+  for (const r of rows) {
+    if (!by[r.agent_key]) { by[r.agent_key] = { r, ind: null, seq: null }; agents.push(by[r.agent_key]); }
+    if (r.mode === 'ind') by[r.agent_key].ind = r.cost;
+    if (r.mode === 'seq') by[r.agent_key].seq = r.cost;
+  }
+  const chart = (title, field, fmt) => {
+    const tot = (a) => ((a.ind && a.ind[field]) || 0) + ((a.seq && a.seq[field]) || 0);
+    const max = Math.max(1, ...agents.map(tot));
+    const list = agents.slice().sort((a, b) => tot(b) - tot(a));
+    return `<div class="chart"><h4>${title}</h4>` + list.map((a) => {
+      const s = agentStyle(a.r.agent_key, a.r.agent);
+      const iv = (a.ind && a.ind[field]) || 0, sv = (a.seq && a.seq[field]) || 0;
+      const tip = esc(`<b>${esc(a.r.agent)}</b><br>Independent: ${fmt(iv)}<br>Sequential: ${fmt(sv)}`);
+      return `<div class="crow" data-tip="${tip}"><span class="who">${avatar(a.r, true)}${esc(a.r.agent)}</span>` +
+        `<span class="ctrack" style="--c:${s.color}"><i class="ind" style="width:${100 * iv / max}%"></i><i class="seq" style="width:${100 * sv / max}%"></i></span>` +
+        `<span class="tot">${fmt(iv + sv)}</span></div>`;
+    }).join('') + '<div class="key"><span>Independent campaign</span><span class="s">Sequential campaign</span></div></div>';
+  };
+  $('#cost-charts').innerHTML =
+    chart('Agent-hours', 'agent_hours', (v) => hours(v) || '\u2014') +
+    chart('Tokens', 'tokens', (v) => tokens(v) || '\u2014');
+
+  const head = '<thead><tr><th class="l">Agent</th><th class="l">Run directory</th><th class="l">Bench SHA-256</th><th>Bench files</th></tr></thead>';
+  const body = agents.filter((a) => a.r.provenance).map((a) =>
+    `<tr><td class="l">${agentCell(a.r)}</td><td class="l"><code>${esc(a.r.provenance.run_dir)}</code></td>` +
+    `<td class="l"><code class="hash">${esc(a.r.provenance.bench_sha256)}</code></td><td>${a.r.provenance.bench_files ?? NIL}</td></tr>`).join('');
+  $('#t-prov').innerHTML = head + '<tbody>' + (body ||
+    '<tr><td class="l" colspan="4">Run directories were not reachable when this board was built; see <code>leaderboard.json</code>.</td></tr>') + '</tbody>';
+}
+
+/* ---------------- base models ---------------- */
+function renderBaseModels() {
+  const board = DATA.boards.models || {};
+  if (board.rows && board.rows.length) {
+    $('[data-tab="basemodels"]').hidden = false;
+    const head = '<thead><tr><th class="c">#</th><th class="l">Model</th><th>Score</th><th>Correct</th><th>Geomean</th><th class="l">Scope</th><th>Tokens</th></tr></thead>';
+    const body = board.rows.map((r, i) =>
+      `<tr><td class="c"><span class="rank${i < 3 ? ' r' + (i + 1) : ''}">${i + 1}</span></td><td class="l"><b>${esc(r.model)}</b></td>` +
+      `<td><b>${num(r.score)}</b></td><td>${r.correct ?? '?'}/${r.benched ?? '?'}</td><td>${chip(r.geomean)}</td>` +
+      `<td class="l">${esc(r.scope || '')}</td><td>${tokens(r.cost && r.cost.tokens) || NIL}</td></tr>`).join('');
+    $('#t-models').innerHTML = head + '<tbody>' + body + '</tbody>';
+    return;
+  }
+  const s = board.scope_note;
+  if (!s) return;
+  $('#faq-list').insertAdjacentHTML('beforeend',
+    '<details><summary>Is there a leaderboard for base models?</summary>' +
+    `<p>Not in this release. ${esc(s.question)}</p><p>${esc(s.why_deferred)}</p><p>${esc(s.unblocked_by)}</p></details>`);
+}
+
+/* ---------------- static bindings ---------------- */
+function renderBindings() {
+  const env = DATA.environment || {};
+  const u = DATA.universe || {};
+  const t = DATA.targets_per_level || {};
+  const nTargets = sum(Object.values(t));
+  const hw = `${env.gpu_count || '?'}\u00d7 ${env.gpu || 'GPU'}`;
+  const bind = (key, text) => $$(`[data-bind="${key}"]`).forEach((el) => { el.textContent = text; });
+  bind('lambda', DATA.metric.lambda);
+  bind('tau', DATA.metric.tau);
+  bind('nModels', u.n_models);
+  bind('hardware', hw);
+  bind('targets', `${nTargets} targets: ${t['1']} L1, ${t['2']} L2, ${t['3']} L3`);
+
+  const parts = [
+    `Measured on ${hw}`, env.torch && `torch ${env.torch}`, env.vllm && `vLLM ${env.vllm}`,
+    env.transformers && `transformers ${env.transformers}`, env.fastkernels && `fastkernels ${env.fastkernels}`,
+    env.captures && `captures ${env.captures}`,
+  ].filter(Boolean);
+  $('#foot-env').innerHTML =
+    `<p>${parts.map(esc).join(' &middot; ')}</p>` +
+    `<p>&lambda; = ${esc(DATA.metric.lambda)} (equal throughput/latency weight) &middot; &tau; = ${esc(DATA.metric.tau)} &middot; ` +
+    `generated ${esc(String(DATA.generated_at).replace('T', ' ').replace('+00:00', ' UTC'))}</p>`;
+}
+
+function initLinks() {
+  $$('[data-repo-link]').forEach((a) => { a.href = REPO; });
+  $$('[data-bind="repoGit"]').forEach((el) => { el.textContent = REPO + '.git'; });
+  const body = [
+    '### Agent',
+    '- Name: ',
+    '- Base model(s): ',
+    '- Code or write-up: ',
+    '',
+    '### Candidate sets',
+    '- Independent set (L1-L3, required): <link to archive or repository>',
+    '- Sequential set (L2-L3 on frozen lower-level winners, optional): ',
+    '',
+    '### Cost (optional)',
+    '- Agent-hours: ',
+    '- Tokens: ',
+    '',
+    '### Checklist',
+    '- [ ] Candidate class names and `__init__`/`forward` signatures match the baselines',
+    '- [ ] `fastkernels bench --standalone` runs on my candidate set',
+  ].join('\n');
+  const params = new URLSearchParams({ title: '[Leaderboard submission] <agent name>', labels: 'leaderboard-submission', body });
+  $$('[data-submit-link]').forEach((a) => { a.href = `${REPO}/issues/new?${params}`; });
+}
+
+/* ---------------- interaction ---------------- */
+function rerender(key) {
+  if (['metric', 'lambda', 'mode'].includes(key)) renderBoard();
+  if (key === 'heatView' || key === 'heatLambda') renderHeat();
+  if (key === 'kMode') renderKernel();
+}
+function setState(key, val) {
+  state[key] = val;
+  $$(`.seg[data-key="${key}"] button`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.val === val)));
+  rerender(key);
+}
+
+document.addEventListener('click', (e) => {
+  const segBtn = e.target.closest('.seg button');
+  if (segBtn && !segBtn.disabled) {
+    setState(segBtn.parentElement.dataset.key, segBtn.dataset.val);
+    return;
+  }
+  const sortTh = e.target.closest('th[data-sort]');
+  if (sortTh) { setState('metric', sortTh.dataset.sort); return; }
+
+  const row = e.target.closest('tr.row');
+  if (row) {
+    const k = row.dataset.key;
+    state.open.has(k) ? state.open.delete(k) : state.open.add(k);
+    renderBoard();
+    const again = $(`tr.row[data-key="${CSS.escape(k)}"]`);
+    if (again) again.focus({ preventScroll: true });
+    return;
+  }
+  const tab = e.target.closest('[role="tab"]');
+  if (tab) {
+    $$('[role="tab"]').forEach((b) => b.setAttribute('aria-selected', String(b === tab)));
+    $$('.tabpanel').forEach((p) => { p.hidden = p.dataset.panel !== tab.dataset.tab; });
+    return;
+  }
+  const copy = e.target.closest('.copy');
+  if (copy) {
+    const text = copy.closest('.code').querySelector('code').innerText
+      .split('\n').filter((l) => !l.trim().startsWith('#')).map((l) => l.replace(/^\$ /, '')).join('\n').trim();
+    const done = () => {
+      copy.textContent = 'Copied'; copy.classList.add('done');
+      setTimeout(() => { copy.textContent = 'Copy'; copy.classList.remove('done'); }, 1400);
+    };
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => {});
+    return;
+  }
+  if (e.target.closest('#theme-toggle')) {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('fk-theme', next); } catch (err) {}
+  }
+});
+document.addEventListener('keydown', (e) => {
+  const row = e.target.closest && e.target.closest('tr.row');
+  if (row && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); row.click(); }
+});
+
+const tip = $('#tip');
+document.addEventListener('mouseover', (e) => {
+  const el = e.target.closest('[data-tip]');
+  if (!el || !el.dataset.tip) { tip.classList.remove('show'); return; }
+  tip.innerHTML = el.dataset.tip;
+  tip.classList.add('show');
+  const r = el.getBoundingClientRect();
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  const x = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8));
+  let y = r.top - h - 8;
+  if (y < 72) y = r.bottom + 8;
+  tip.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+});
+window.addEventListener('scroll', () => tip.classList.remove('show'), { passive: true });
+
+initLinks();
+fetch('leaderboard.json')
+  .then((r) => {
+    if (!r.ok) throw new Error(`leaderboard.json: HTTP ${r.status}`);
+    return r.json();
+  })
+  .then((d) => {
+    DATA = d;
+    renderBindings();
+    renderHero();
+    renderBoard();
+    renderHeat();
+    renderKernel();
+    renderComposition();
+    renderCost();
+    renderBaseModels();
+  })
+  .catch((err) => {
+    $('main').insertAdjacentHTML('afterbegin',
+      `<div class="banner"><b>Could not load the leaderboard data.</b> ${esc(err.message)}. ` +
+      'Run <code>python docs/leaderboard/export_leaderboard.py</code> first, and serve this directory over HTTP ' +
+      '(<code>python -m http.server</code>); browsers block <code>fetch</code> from a <code>file://</code> page.</div>');
+    console.error(err);
+  });
+</script>
+</body>
+</html>
