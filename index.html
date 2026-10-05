@@ -7,23 +7,23 @@
   <!-- Primary Meta Tags -->
   <title>FastKernels: Benchmarking GPU Kernel Generation in Production</title>
   <meta name="title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
-  <meta name="description" content="FastKernels is a production-grade benchmark and inference framework for GPU kernel generation. 46 architectures across 8 categories subsume 96.2% (409/425) of HuggingFace Transformers architectures.">
-  <meta name="keywords" content="FastKernels, GPU kernels, CUDA, Triton, kernel generation, LLM agents, inference, vLLM, SGLang, benchmark, KernelBench, kb_nano, MoE, FlashAttention, FlashInfer">
-  <meta name="author" content="Gabriele Oliaro, Yichao Fu, May Jiang, Owen Lu, Junli Wang, Zhihao Jia, Hao Zhang, Samyam Rajbhandari">
+  <meta name="description" content="FastKernels is a benchmark of 384 GPU-kernel tasks from 47 architectures. Kernels reimplement 94.6% (472/499) of HuggingFace Transformers architectures, and MacroEval scores agents by what survives production deployment.">
+  <meta name="keywords" content="FastKernels, GPU kernels, CUDA, Triton, kernel generation, LLM agents, inference, vLLM, SGLang, benchmark, KernelBench, MacroEval, MoE, FlashAttention, FlashInfer">
+  <meta name="author" content="Gabriele Oliaro, Jaeseong Lee, Yichao Fu, Zhaoyuan Su, Owen Lu, Sreeram Vennam, May Jiang, Junli Wang, Hao Zhang, Zhihao Jia, Samyam Rajbhandari">
   <meta name="robots" content="index, follow">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://fastkernels.github.io/">
   <meta property="og:title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
-  <meta property="og:description" content="A production-grade benchmark and inference framework for GPU kernel generation, covering 46 architectures across 8 categories.">
+  <meta property="og:description" content="A benchmark of 384 GPU-kernel tasks from 47 architectures. Kernel-level speedups of up to 6.6× shrink to at most 1.25× end to end.">
   <meta property="og:image" content="https://fastkernels.github.io/images/overview.png">
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image">
   <meta property="twitter:url" content="https://fastkernels.github.io/">
   <meta property="twitter:title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
-  <meta property="twitter:description" content="A production-grade benchmark and inference framework for GPU kernel generation.">
+  <meta property="twitter:description" content="384 tasks from 47 architectures. Kernel-level speedups of up to 6.6× shrink to at most 1.25× end to end.">
   <meta property="twitter:image" content="https://fastkernels.github.io/images/overview.png">
 
   <!-- Canonical URL -->
@@ -32,12 +32,15 @@
   <!-- Additional SEO -->
   <meta name="citation_title" content="FastKernels: Benchmarking GPU Kernel Generation in Production">
   <meta name="citation_author" content="Oliaro, Gabriele">
+  <meta name="citation_author" content="Lee, Jaeseong">
   <meta name="citation_author" content="Fu, Yichao">
-  <meta name="citation_author" content="Jiang, May">
+  <meta name="citation_author" content="Su, Zhaoyuan">
   <meta name="citation_author" content="Lu, Owen">
+  <meta name="citation_author" content="Vennam, Sreeram">
+  <meta name="citation_author" content="Jiang, May">
   <meta name="citation_author" content="Wang, Junli">
-  <meta name="citation_author" content="Jia, Zhihao">
   <meta name="citation_author" content="Zhang, Hao">
+  <meta name="citation_author" content="Jia, Zhihao">
   <meta name="citation_author" content="Rajbhandari, Samyam">
   <meta name="citation_publication_date" content="2026">
   <meta name="citation_arxiv_id" content="arXiv:2605.23215">
@@ -233,6 +236,67 @@
       color: var(--text-secondary);
       margin-top: 0.4rem;
     }
+
+    .figure-caption {
+      margin-top: 0.75rem;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+
+    .section .column {
+      min-width: 0;
+    }
+
+    .table-scroll {
+      overflow-x: auto;
+      max-width: 100%;
+      margin: 0.5rem 0 0.2rem;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .content pre {
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    .content p code,
+    .content li code {
+      overflow-wrap: anywhere;
+    }
+
+    .fk-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .fk-table th,
+    .fk-table td {
+      border-bottom: 1px solid var(--border-color);
+      padding: 0.42rem 0.5rem;
+      text-align: right;
+      white-space: nowrap;
+      color: var(--text-primary);
+      background: transparent;
+    }
+
+    .fk-table th:first-child,
+    .fk-table td:first-child,
+    .fk-table.with-mode th:nth-child(2),
+    .fk-table.with-mode td:nth-child(2) {
+      text-align: left;
+    }
+
+    .fk-table thead th {
+      color: var(--accent-color);
+      font-family: 'Texta', 'Google Sans', sans-serif !important;
+      font-weight: 700;
+    }
+
+    .fk-table tbody tr.best td {
+      font-weight: 700;
+    }
   </style>
 
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
@@ -261,13 +325,22 @@
               <a href="https://www.gabrieleoliaro.com/">Gabriele Oliaro</a><sup>1,2</sup><sup>*</sup>
             </span>
             <span class="author-block" style="padding-left:18px">
+              <a href="https://thnkinbtfly.github.io/">Jaeseong Lee</a><sup>1</sup><sup>*</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
               <a href="https://viol2000.github.io/">Yichao Fu</a><sup>3</sup><sup>*</sup>
             </span>
             <span class="author-block" style="padding-left:18px">
-              <a href="https://www.linkedin.com/in/may-jiang">May Jiang</a><sup>4</sup>
+              <a href="https://alexsssu.github.io/">Zhaoyuan Su</a><sup>1</sup>
             </span>
             <span class="author-block" style="padding-left:18px">
               Owen Lu<sup>2</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              <a href="https://vnnm404.github.io/">Sreeram Vennam</a><sup>2</sup>
+            </span>
+            <span class="author-block" style="padding-left:18px">
+              <a href="https://www.linkedin.com/in/may-jiang">May Jiang</a><sup>4</sup>
             </span>
             <span class="author-block" style="padding-left:18px">
               <a href="https://junliwang.tech/">Junli Wang</a><sup>3</sup>
@@ -297,7 +370,7 @@
           <div class="column has-text-centered" style="margin-top: 1.2rem;">
             <div class="publication-links">
               <span class="link-block">
-                <a href="https://arxiv.org/abs/2605.23215"
+                <a href="https://arxiv.org/pdf/2605.23215"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="fas fa-file-pdf"></i>
@@ -324,7 +397,7 @@
                 </a>
               </span>
               <span class="link-block">
-                <a href="https://snowflake-84d72a0d.mintlify.app/intro"
+                <a href="https://github.com/Snowflake-AI-Research/fastkernels/tree/main/docs"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="fas fa-book"></i>
@@ -345,9 +418,9 @@
     <div class="hero-body">
       <center><img src="./images/overview.png" alt="FastKernels Overview" width="100%"></center>
       <div class="content has-text-justified" style="margin-top: 1rem;">
-        <b>FastKernels overview.</b> Three benchmark–production misalignments (left) motivate three design pillars (center),
-        which converge into a unified benchmark-as-framework design (right). Optimized kernels flow through a virtuous cycle (bottom):
-        optimization, validation, integration as new baselines, and release.
+        <b>FastKernels overview.</b> Tasks derived from 47 real architectures form a compositional L1&ndash;L4 hierarchy
+        with production interfaces and run inside validated production model executions. Candidates are scored by capture,
+        kernel-level bench, and end-to-end eval, aggregated by MacroEval. Optimized kernels deploy directly or transfer into vLLM and SGLang.
       </div>
     </div>
   </div>
@@ -359,26 +432,26 @@
     <div class="columns is-multiline is-mobile">
       <div class="column is-3-tablet is-6-mobile">
         <div class="stat-card">
-          <div class="stat-number">46</div>
-          <div class="stat-label">representative architectures</div>
+          <div class="stat-number">384</div>
+          <div class="stat-label">tasks, from primitives to full models</div>
         </div>
       </div>
       <div class="column is-3-tablet is-6-mobile">
         <div class="stat-card">
-          <div class="stat-number">8</div>
-          <div class="stat-label">model categories</div>
+          <div class="stat-number">47</div>
+          <div class="stat-label">architectures across 8 categories</div>
         </div>
       </div>
       <div class="column is-3-tablet is-6-mobile">
         <div class="stat-card">
-          <div class="stat-number">96.2%</div>
-          <div class="stat-label">HF Transformers coverage (409 / 425)</div>
+          <div class="stat-number">94.6%</div>
+          <div class="stat-label">HF Transformers coverage (472 / 499)</div>
         </div>
       </div>
       <div class="column is-3-tablet is-6-mobile">
         <div class="stat-card">
-          <div class="stat-number">L1&ndash;L4</div>
-          <div class="stat-label">compositional task hierarchy</div>
+          <div class="stat-number">1.25&times;</div>
+          <div class="stat-label">largest deployable end-to-end speedup</div>
         </div>
       </div>
     </div>
@@ -395,27 +468,24 @@
         <h2 class="title is-3">Abstract</h2>
         <div class="content has-text-justified">
           <p>
-            LLM-based agents for GPU kernel generation are advancing rapidly, yet their progress is fundamentally constrained by the
-            benchmarks they optimize against. Existing benchmarks are poorly aligned with production inference frameworks: they
-            evaluate kernels on a single GPU with synthetic inputs, ignore the surrounding compilation stack, and reward replicating
-            known optimizations rather than discovering new ones. The resulting reward signals are misleading&mdash;agents learn to
-            generate kernels that score well in sandboxes but introduce interface incompatibilities, compilation-stack conflicts, and
-            silent correctness degradation when integrated into real systems.
+            LLM-based agents for GPU kernel generation are advancing rapidly, but the benchmarks they optimize against evaluate
+            kernels in isolation, with synthetic inputs and weak baselines, rewarding sandbox speedups that break or vanish in real
+            inference systems.
           </p>
           <p>
-            We introduce <b>FastKernels</b>, a kernel benchmark built around a minimal set of <b>46 representative architectures</b>
-            spanning 8 categories, whose kernels collectively subsume those of <b>96.2% (409/425)</b> of HuggingFace Transformers
-            architectures. FastKernels doubles as a minimalistic, production-grade inference framework that runs at parity with
-            hardened systems such as vLLM and SGLang on mainstream LLM serving and substantially exceeds upstream references on
-            under-served architectures; each task's interface mirrors the corresponding module in the state-of-the-art library for its
-            architecture family, enabling direct deployment of optimized kernels into production codebases.
+            We introduce <b>FastKernels</b>, a benchmark of <b>384 tasks</b> drawn from <b>47 representative architectures</b>
+            across 8 categories, whose kernels suffice to reimplement <b>94.6% (472/499)</b> of HuggingFace Transformers
+            architectures with outputs matching the native implementations. Each task mirrors the interface of the corresponding
+            production module and is scored against the kernels production frameworks ship. Tasks form a compositional hierarchy,
+            from primitives to full models, in which higher-level modules import lower-level ones.
           </p>
           <p>
-            Evaluating state-of-the-art kernel agents on FastKernels, we find that even the strongest agent achieves only
-            <b>0.94&times;</b> aggregate speedup over production baselines, with weaker agents at <b>0.78&times;</b> and
-            <b>0.53&times;</b>&mdash;confirming that benchmark&ndash;production misalignment is a critical bottleneck for the field.
-            We release FastKernels as a stepping stone toward kernel agents whose benchmark gains translate directly into production
-            throughput improvements.
+            Candidates are scored at the kernel level and end to end inside the models they come from, on the production execution
+            path. <b>MacroEval</b> aggregates calibrated correctness, coverage, and speedup into a leaderboard. Seeding it with five
+            representative agents (6,900 agent-hours), we find that kernel-level speedups of <b>1.6&ndash;6.6&times;</b> shrink to
+            <b>at most 1.25&times;</b> end to end, <b>only 20%</b> of winning kernel sets run correctly as-is, and kernel-level
+            scores mis-rank agents: Claude Code matches or beats KDA at every level in isolation, yet KDA scores <b>3&times;</b>
+            higher end to end.
           </p>
         </div>
       </div>
@@ -445,9 +515,9 @@
             compilation-stack conflicts, and correctness degradation that only appears at model scale.
           </p>
           <p>
-            FastKernels closes this gap by being a benchmark that <b>is</b> the framework: optimized kernels run inside a real
-            inference pipeline rather than being ported from a separate harness, and each task's interface mirrors the corresponding
-            module in production libraries so winning kernels are immediately deployable.
+            FastKernels closes this gap by scoring every candidate inside the models its tasks come from, on the production
+            execution path (continuous batching, chunked prefill, CUDA graphs, <code>torch.compile</code>, tensor parallelism),
+            and by giving each task the interface of the corresponding production module so winning kernels transfer into vLLM and SGLang.
           </p>
         </div>
       </div>
@@ -470,11 +540,12 @@
       <div class="column is-6">
         <div class="stat-card" style="text-align: left; height: 100%;">
           <h3 class="title is-5" style="margin-bottom: 0.6rem;">
-            <i class="fas fa-cogs" style="margin-right: 0.5rem;"></i> Benchmark-as-framework
+            <i class="fas fa-cogs" style="margin-right: 0.5rem;"></i> Production-aligned task suite
           </h3>
           <p>
-            FastKernels is a self-contained inference framework whose task interfaces match production modules, so optimized
-            kernels can be evaluated in place and transferred into systems such as vLLM and SGLang with no heavy refactoring.
+            384 tasks from 47 architectures across 8 categories, from dense and MoE LLMs and SSMs to vision, audio, robotics,
+            3D, recommendation, and world models. Each task uses a production module interface, and speedups are measured against
+            the kernels that library ships.
           </p>
         </div>
       </div>
@@ -484,8 +555,9 @@
             <i class="fas fa-layer-group" style="margin-right: 0.5rem;"></i> Compositional task hierarchy
           </h3>
           <p>
-            Tasks progress from primitives (L1) to fused operators (L2), layers (L3), and full models (L4). Agents can reuse
-            lower-level optimizations inside higher-level modules instead of solving each level independently.
+            Primitives feed fused operators, which feed layers and full models. The hierarchy exposes composition effects:
+            37% of the agents' L3 winners break once their own lower-level kernels are active, and regenerating them on frozen
+            lower-level winners yields 80 correct L3 winners instead of 45.
           </p>
         </div>
       </div>
@@ -495,44 +567,20 @@
             <i class="fas fa-microchip" style="margin-right: 0.5rem;"></i> Production-faithful evaluation
           </h3>
           <p>
-            Kernels are evaluated with production baselines (cuBLAS, FlashAttention-3, FlashInfer, vLLM CUDA ops, DeepGEMM, FLA),
-            captured tensors, compilation-stack effects, and multi-GPU communication including tensor and expert parallelism.
+            Kernel-level scoring uses captured production shapes. Collectives run on real tensor-parallel groups, and every
+            candidate is also scored end to end inside full models on the production path, including compilation-stack effects.
           </p>
         </div>
       </div>
       <div class="column is-6">
         <div class="stat-card" style="text-align: left; height: 100%;">
           <h3 class="title is-5" style="margin-bottom: 0.6rem;">
-            <i class="fas fa-check-double" style="margin-right: 0.5rem;"></i> End-to-end validation &amp; metrics
+            <i class="fas fa-check-double" style="margin-right: 0.5rem;"></i> A deployment-grounded leaderboard
           </h3>
           <p>
-            FastKernels injects generated kernels into full model executions, checks downstream quality, and reports
-            <b>MacroEval</b>, which combines calibrated correctness, coverage, and end-to-end throughput&ndash;latency speedup
-            across model families.
-          </p>
-        </div>
-      </div>
-      <div class="column is-6">
-        <div class="stat-card" style="text-align: left; height: 100%;">
-          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
-            <i class="fas fa-globe" style="margin-right: 0.5rem;"></i> Broad architecture coverage
-          </h3>
-          <p>
-            46 architectures across 8 categories&mdash;dense and MoE LLMs, linear attention and SSMs, vision, audio, video,
-            robotics, 3D graphics, recommendation, and world models&mdash;benchmarked against production references rather than
-            hardware-theoretical bounds.
-          </p>
-        </div>
-      </div>
-      <div class="column is-6">
-        <div class="stat-card" style="text-align: left; height: 100%;">
-          <h3 class="title is-5" style="margin-bottom: 0.6rem;">
-            <i class="fas fa-network-wired" style="margin-right: 0.5rem;"></i> Multi-GPU communication kernels
-          </h3>
-          <p>
-            To our knowledge the first kernel benchmark to include collectives as first-class tasks: tensor-parallel all-reduce
-            / reduce-scatter, expert-parallel all-to-all dispatch and combine for MoE routing, and computation&ndash;communication
-            overlap kernels.
+            <b>MacroEval</b> ranks agents by calibrated correctness, coverage, and end-to-end speedup across model families.
+            In the seed evaluation, kernel-level speedups of up to 6.6&times; shrink to at most 1.25&times; end to end, and
+            kernel-level scores mis-rank agents.
           </p>
         </div>
       </div>
@@ -550,10 +598,10 @@
         <h2 class="title is-3">Compositional Task Hierarchy</h2>
         <div class="content has-text-justified">
           <p>
-            FastKernels organizes tasks into four levels of increasing scope. Unlike benchmarks whose levels are independent,
-            this hierarchy enables a dynamic-programming style optimization loop: an agent can reuse an optimized lower-level
-            kernel (e.g. a linear operator) when optimizing higher-level modules (e.g. MLPs or transformer blocks), instead of
-            rediscovering the same building block from scratch.
+            FastKernels organizes 384 tasks into four levels of increasing scope: 108 L1, 155 L2, and 74 L3 kernel tasks, shared
+            across architectures, plus 47 end-to-end L4 models. Higher-level baselines import lower-level modules, so an agent can
+            reuse an optimized linear operator inside an MLP or transformer block. In standalone mode each candidate is benched
+            over production children; in composed mode every candidate file is active at once. The gap is the composition effect.
           </p>
         </div>
       </div>
@@ -591,9 +639,8 @@
         <div class="stat-card" style="text-align: left; height: 100%;">
           <h3 class="title is-5"><span style="color: var(--accent-hover);">L4</span> &mdash; End-to-end models</h3>
           <p>
-            Full model inference paths evaluated as integrated systems. The 46 representative architectures in L4 serve as the
-            end-to-end evaluation set, and underlying L1&ndash;L3 kernels cover the overwhelming majority of operators across
-            ML and AI models.
+            Full model inference paths evaluated as integrated systems. The 47 L4 architectures are the end-to-end set; the
+            shared L1&ndash;L3 kernels cover most operators across those models, from 1.58-bit through FP32.
           </p>
         </div>
       </div>
@@ -610,22 +657,188 @@
     <div class="columns is-centered has-text-centered">
       <div class="column is-four-fifths">
         <h2 class="title is-3">Results</h2>
+        <h2 class="title is-5">The benchmark matches production references</h2>
 
-        <h2 class="title is-5">Per-architecture speedup over production references</h2>
-
-        <center><img src="./images/eval_speedup_breakdown_compact.png" alt="Per-architecture speedup breakdown" width="100%"></center>
+        <img src="./images/eval_e2e.png" alt="Category-level end-to-end speedup of FastKernels over production references" width="100%">
+        <p class="figure-caption">
+          <b>End-to-end speedup by category on B200.</b> Each bar is the geometric-mean speedup of FastKernels over the
+          production reference for that category (architecture count in parentheses). The dashed line is parity.
+        </p>
 
         <div class="content has-text-justified">
           <p>
-            <b>Each bar shows the speedup of FastKernels over the strongest production or upstream reference for one architecture.</b>
-            Panels group architectures by category; the dashed line in each panel marks the average speedup within that category.
+            Before any agent is scored, every architecture is checked against the production framework for its family
+            (vLLM and SGLang for serving, diffusers for SDXL, FLA for linear attention, timm for vision encoders, and the
+            corresponding upstream repositories elsewhere). On the full set&mdash;47 scenarios, 184 workloads, tensor
+            parallel 1&ndash;8&mdash;gains concentrate in linear attention (<b>1.45&times;</b> throughput) and recommendation
+            (<b>1.51&times;</b>). The other categories sit near parity. References are pinned per release and GPU; the LLM
+            rows use vLLM&nbsp;0.26.0.
+          </p>
+        </div>
+
+        <img src="./images/eval_speedup_breakdown_b200.png" alt="Per-architecture throughput speedup on B200" width="100%">
+        <p class="figure-caption">
+          <b>Per-architecture throughput speedup on B200</b>, grouped by category. Bars above the axis limit are clipped
+          and labeled; the dashed line is parity.
+        </p>
+
+        <div class="content has-text-justified">
+          <p>
+            The largest throughput gains are on architectures whose reference is a research repository or a non-serving
+            library: <b>RetNet 3.40&times;</b>, <b>ColBERTv2 3.13&times;</b>, <b>Pi0 3.09&times;</b>, <b>BGE-M3 2.35&times;</b>,
+            and <b>CosyVoice3 2.30&times;</b>. Mainstream LLM serving stays at parity with the hardened frameworks
+            (Llama-3.1 0.95&times;, Mixtral 1.06&times;, GPT-OSS 0.95&times;).
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="columns is-centered has-text-centered">
+      <div class="column">
+        <br>
+        <h2 class="title is-5">Kernel-level winners rarely survive deployment</h2>
+        <div class="content has-text-justified">
+          <p>
+            Five agents optimize every L1&ndash;L3 operator captured from the <b>default set</b> on B200: 47 L1, 64 L2, and
+            21 L3 targets drawn from 11 models that span all 8 categories. The agents are Dr.&nbsp;Kernel (an RL-trained
+            KernelBench model), KDA and AKO (long-horizon harnesses from winning MLSys 2026 FlashInfer contest entries),
+            and Claude Code and Codex, the coding agents those harnesses build on. The campaigns total <b>6,900 agent-hours</b>
+            and 42B tokens.
           </p>
           <p>
-            Across 46 representative benchmarks, FastKernels averages <b>1.24&times;</b> throughput (<b>1.04&times;</b> median).
-            On mainstream LLM serving against hardened frameworks like vLLM and SGLang, FastKernels sits at parity
-            (e.g. Llama-3.1 1.04&times;, GPT-OSS 1.02&times;, Mixtral 0.97&times;, DeepSeek-V3.2 0.84&times;). Supra-unity gains
-            concentrate on architectures whose only available reference is a research repository or a non-serving library:
-            <b>Pi0 3.48&times;</b>, <b>ColBERTv2 3.08&times;</b>, <b>CosyVoice3 2.13&times;</b>, RetNet / GLA ~1.86&times; vs. FLA.
+            Each agent's independent and sequential winner sets are then deployed into the 11 models and run on the production
+            path. If a set crashes a model or corrupts its outputs, the offending kernel is dropped and the model is re-run.
+            The first subset that runs correctly is the deployable subset. <b>MacroEval</b> ranks that subset; the last column
+            is how many models run when every kernel-level winner is swapped in unchanged.
+          </p>
+        </div>
+
+        <div class="table-scroll">
+          <table class="fk-table with-mode">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Mode</th>
+                <th>Valid</th>
+                <th>Coverage</th>
+                <th>Correctness</th>
+                <th>Speedup</th>
+                <th>Score</th>
+                <th>Rank</th>
+                <th>As-is</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="best">
+                <td>KDA</td><td>Independent</td><td>11/11</td><td>1.00</td><td>0.98</td><td>1.13&times;</td><td>1.11</td><td>1</td><td>4/11</td>
+              </tr>
+              <tr>
+                <td>KDA</td><td>Sequential</td><td>11/11</td><td>1.00</td><td>0.98</td><td>1.04&times;</td><td>1.03</td><td>2</td><td>6/11</td>
+              </tr>
+              <tr>
+                <td>AKO</td><td>Sequential</td><td>9/11</td><td>0.83</td><td>0.82</td><td>1.25&times;</td><td>0.85</td><td>3</td><td>2/11</td>
+              </tr>
+              <tr>
+                <td>Dr.&nbsp;Kernel</td><td>Independent</td><td>9/11</td><td>0.75</td><td>0.85</td><td>0.98&times;</td><td>0.63</td><td>4</td><td>2/11</td>
+              </tr>
+              <tr>
+                <td>Dr.&nbsp;Kernel</td><td>Sequential</td><td>9/11</td><td>0.75</td><td>0.75</td><td>0.99&times;</td><td>0.55</td><td>5</td><td>2/11</td>
+              </tr>
+              <tr>
+                <td>Codex</td><td>Sequential</td><td>8/11</td><td>0.71</td><td>0.71</td><td>1.10&times;</td><td>0.55</td><td>6</td><td>1/11</td>
+              </tr>
+              <tr>
+                <td>AKO</td><td>Independent</td><td>7/11</td><td>0.56</td><td>0.65</td><td>1.15&times;</td><td>0.42</td><td>7</td><td>1/11</td>
+              </tr>
+              <tr>
+                <td>Claude Code</td><td>Independent</td><td>6/11</td><td>0.52</td><td>0.61</td><td>1.09&times;</td><td>0.35</td><td>8</td><td>2/11</td>
+              </tr>
+              <tr>
+                <td>Claude Code</td><td>Sequential</td><td>7/11</td><td>0.56</td><td>0.55</td><td>1.11&times;</td><td>0.34</td><td>9</td><td>1/11</td>
+              </tr>
+              <tr>
+                <td>Codex</td><td>Independent</td><td>5/11</td><td>0.33</td><td>0.33</td><td>0.96&times;</td><td>0.11</td><td>10</td><td>1/11</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">
+          <b>End-to-end MacroEval on the default set (B200).</b> Speedup is <i>S</i><sub>macro</sub> at &lambda;&nbsp;=&nbsp;0.5.
+          Score is speedup &times; correctness &times; macro-coverage. As-is is models that run correctly with the full winner set unchanged.
+        </p>
+
+        <div class="content has-text-justified">
+          <p>
+            Swapped in unchanged, only <b>22 of 110</b> winner-set deployments run correctly (about 20%). Compilation-stack
+            conflicts and crashes on engine shapes the kernel bench never produced account for 86% of the drops with an
+            identified cause. Even after those kernels are dropped, end-to-end speedups stay in <b>0.96&ndash;1.25&times;</b>
+            despite kernel-level speedups of up to 6.6&times;. Gains concentrate where the rewritten kernels dominate runtime
+            (up to 2.2&times; on YOLOv10, 1.7&times; on OpenFold3, 1.5&times; on GLA), while LLM serving stays within 6% of
+            the production kernels. Sequential generation raises AKO and Codex from 1.15&times; and 0.96&times; to
+            <b>1.25&times;</b> and 1.10&times;.
+          </p>
+          <p>
+            Kernel-level scores mis-rank the same agents. In isolation, Claude Code matches or beats KDA on correctness and
+            speedup at every level (L3: 20 vs.&nbsp;20 correct, 4.74&times; vs.&nbsp;3.05&times;), yet KDA's MacroEval score
+            is <b>3&times;</b> higher (1.11 vs.&nbsp;0.35). The gap is deployability: all 11 of KDA's models are valid, versus
+            6 of Claude Code's, at nearly the same speed (1.13&times; vs.&nbsp;1.09&times;). KDA wraps the same Claude model
+            in a planning and review harness, which a kernel-level leaderboard cannot credit.
+          </p>
+        </div>
+
+        <br>
+        <h2 class="title is-5">In isolation, four agents beat the production kernels</h2>
+        <img src="./images/kernel_fastp.png" alt="Share of targets faster than a speedup threshold, by agent and level" width="100%">
+        <p class="figure-caption">
+          <b>fast<sub>p</sub> by level, independent mode.</b> Share of targets whose kernel is correct and more than
+          <i>p</i>&times; faster than the production baseline. Dashed lines mark <i>p</i>&nbsp;=&nbsp;1 and <i>p</i>&nbsp;=&nbsp;2.
+        </p>
+
+        <div class="table-scroll">
+          <table class="fk-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>L1 correct</th>
+                <th>L1 geomean</th>
+                <th>L2 correct</th>
+                <th>L2 geomean</th>
+                <th>L3 correct</th>
+                <th>L3 geomean</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Dr.&nbsp;Kernel</td><td>31/47</td><td>0.93&times;</td><td>18/64</td><td>0.59&times;</td><td>4/21</td><td>0.97&times;</td>
+              </tr>
+              <tr>
+                <td>Claude Code</td><td>47/47</td><td>1.81&times;</td><td>64/64</td><td>2.66&times;</td><td>20/21</td><td>4.74&times;</td>
+              </tr>
+              <tr>
+                <td>KDA</td><td>47/47</td><td>1.64&times;</td><td>63/64</td><td>2.56&times;</td><td>20/21</td><td>3.05&times;</td>
+              </tr>
+              <tr>
+                <td>AKO</td><td>45/47</td><td>1.84&times;</td><td>64/64</td><td>3.35&times;</td><td>18/21</td><td>6.48&times;</td>
+              </tr>
+              <tr>
+                <td>Codex</td><td>47/47</td><td>1.62&times;</td><td>64/64</td><td>2.87&times;</td><td>19/21</td><td>2.92&times;</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="figure-caption">
+          <b>Independent kernel-level results (B200, default set).</b> Each operator is generated and benched over production
+          lower-level kernels. Geomean is over correct operators.
+        </p>
+
+        <div class="content has-text-justified">
+          <p>
+            Composition erodes those numbers. Once an agent's own lower-level winners are active, <b>26 of 71 L3 winners (37%)</b>
+            fail correctness, including 13 of Codex's 18. The surviving L3 winners of KDA and AKO lose 12&ndash;14% of their
+            speedup, and individual modules lose far more (Claude Code's <code>yolov10_backbone</code>, 30.3&times; &rarr; 7.2&times;).
+            Regenerating L2 and L3 on frozen lower-level winners makes composition an optimization target: it yields
+            <b>80 correct L3 winners</b> across agents instead of 45, and the sequential L3 kernels of AKO and Codex are
+            1.48&times; and 1.35&times; faster than their composed independent ones.
           </p>
         </div>
       </div>
@@ -634,44 +847,20 @@
     <div class="columns is-centered has-text-centered">
       <div class="column is-four-fifths">
         <br>
-        <h2 class="title is-5">Existing kernel agents fall below 1&times; on production-shaped tasks</h2>
+        <h2 class="title is-5">Captured inputs change data-dependent kernels</h2>
 
-        <center><img src="./images/evaluation_kernelagent.png" alt="Kernel agent evaluation" width="100%"></center>
-
-        <div class="content has-text-justified">
-          <p>
-            We evaluate three state-of-the-art kernel-generation agents&mdash;<b>Dr.&nbsp;Kernel</b>, <b>KernelAgent</b>, and
-            <b>OpenAI Codex</b>&mdash;on FastKernels L1 and L2 (88 target families). On aggregate, all three land
-            <b>below 1&times;</b> against production-grade references:
-          </p>
-          <ul>
-            <li><b>OpenAI Codex:</b> 0.943&times; geomean (88/88 correct)</li>
-            <li><b>KernelAgent:</b> 0.777&times; geomean (28/76 correct)</li>
-            <li><b>Dr. Kernel:</b> 0.527&times; geomean (8/38 correct)</li>
-          </ul>
-          <p>
-            Two findings explain the gap: <b>(1)</b> production-grade references (cuBLAS, FlashAttention-3, FlashInfer, DeepGEMM,
-            FLA) separate apparent gains from real ones&mdash;Codex hits 1.16&times; on torch-eager-wrapped operators but only
-            0.93&times; on vendor- or hand-written kernels; and <b>(2)</b> production-shaped composite modules (full attention,
-            MoE, and YOLOv10 blocks lifted from production code) are markedly harder than primitives&mdash;every agent that
-            reaches L2 regresses on it.
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="columns is-centered has-text-centered">
-      <div class="column is-four-fifths">
-        <br>
-        <h2 class="title is-5">Captured tensors matter: MoE routing study</h2>
-
-        <center><img src="./images/moe_input_capture.png" alt="MoE captured tensors study" width="100%"></center>
+        <img src="./images/moe_input_capture.png" alt="MoE expert skew under real requests, random token IDs, and random tensors" width="100%">
+        <p class="figure-caption">
+          <b>Input capture changes data-dependent execution.</b> First MoE layer of Qwen3-VL-30B-A3B-Instruct-FP8
+          (128 experts, top-8 routing) under real WildChat requests, random token IDs, and random tensors at the gate.
+        </p>
 
         <div class="content has-text-justified">
           <p>
-            FastKernels captures and replays the tensors production models actually feed to kernels. Our MoE routing study shows
-            that <b>synthetic inputs materially change both load skew and hot-expert identity</b>: kernels that look great on
-            uniform-random routing decisions can underperform once the actual production routing distribution is replayed.
+            Random tensors yield a near-uniform gate (Gini 0.232). Random token IDs over-concentrate load and pick different
+            hot experts from real requests (Gini 0.480 vs.&nbsp;0.339; only 4 of the top-16 hot experts in common). The kernel
+            tier can replay golden inputs captured from real end-to-end executions, and the end-to-end tier runs real requests,
+            so data-dependent kernels are scored on the tensors production traffic actually creates.
           </p>
         </div>
       </div>
@@ -693,13 +882,20 @@
             Model families expose different correctness signals&mdash;tokens, embeddings, labels, rankings, trajectories, audio,
             video&mdash;and different throughput&ndash;latency tradeoffs. <b>MacroEval</b> calibrates architecture-specific
             correctness to a common [0,&nbsp;1] scale, measures end-to-end speedup, and macro-averages across families so no single
-            architecture dominates the leaderboard.
+            architecture dominates the leaderboard. The end-to-end table above is this score on the default set.
           </p>
           <p>
-            The default leaderboard score multiplies three components: macro-geometric speedup <i>S</i><sub>macro</sub>,
-            macro-calibrated correctness <i>C</i><sub>macro</sub>, and macro-coverage. This rewards agents that are
-            simultaneously <b>fast, correct, and broadly applicable</b>, while still exposing the three component metrics so users
-            can identify throughput&ndash;correctness or coverage&ndash;performance tradeoffs.
+            For each request, a discrepancy is mapped through two thresholds fixed before evaluation. The lower threshold
+            <i>g</i><sub>i</sub> is the 95th percentile of a noise run: the production reference repeated in a fresh process
+            with a cold compile cache. The upper threshold is <i>f</i><sub>i</sub>&nbsp;=&nbsp;0.5. An item is valid when its
+            calibrated correctness is at least 0.9; crashes, NaNs, and invalid items receive no speedup credit and are penalized
+            through coverage.
+          </p>
+          <p>
+            The default leaderboard score multiplies three components: macro-geometric speedup <i>S</i><sub>macro</sub>
+            (a &lambda;&nbsp;=&nbsp;0.5 blend of throughput and latency), macro-calibrated correctness <i>C</i><sub>macro</sub>,
+            and macro-coverage. The three components are also reported separately, along with throughput-only and latency-only
+            rankings. KDA stays first when the correctness thresholds are halved or doubled.
           </p>
         </div>
       </div>
@@ -717,32 +913,28 @@
         <h2 class="title is-3">Getting Started</h2>
         <div class="content has-text-justified">
           <p>
-            FastKernels requires Python 3.10+, CUDA 12.x, and a recent NVIDIA GPU (Hopper / Blackwell tested; Ampere supported
-            for a subset of kernels). Clone the repository and install:
+            FastKernels requires Python 3.10+, CUDA 12+, and a recent NVIDIA GPU (Hopper / Blackwell tested; Ampere supported
+            for a subset of kernels). Clone the repository and install the <code>fastkernels</code> CLI:
           </p>
-<pre><code>git clone git@github.com:Snowflake-AI-Research/fastkernels.git
-cd kb_nano
+<pre><code>git clone https://github.com/Snowflake-AI-Research/fastkernels.git
+cd fastkernels
 pip install .</code></pre>
           <p>
-            Each supported architecture is implemented under <code>tasks/baseline/</code>, organized by level. To scaffold a
-            candidate kernel with the correct signature:
+            Baselines live in <code>fastkernels/tasks/baseline/</code>, organized by level. Capture the shapes a real workload
+            actually feeds each operator, then scaffold a candidate with the baseline's class name and <code>forward</code> signature:
           </p>
-<pre><code># Scaffold candidate stubs
-python agent/create_stubs.py                       # all operators
-python agent/create_stubs.py --level 1             # L1 only
-python agent/create_stubs.py --architecture llama  # Llama only</code></pre>
+<pre><code>fastkernels list --map
+fastkernels capture minimal
+fastkernels create-stubs --architecture llama</code></pre>
           <p>
-            Then drop your replacement in <code>tasks/candidate/L&lt;level&gt;/&lt;op_name&gt;.py</code> exposing the same class
-            name and <code>forward</code> signature as the baseline. The benchmark validates correctness against the production
-            reference and reports speedup:
+            Drop the replacement in <code>fastkernels/tasks/candidate/L&lt;level&gt;/&lt;op_name&gt;.py</code>. The kernel tier
+            checks correctness and speedup against the production baseline; the end-to-end tier is what the leaderboard reports:
           </p>
-<pre><code># Kernel-level: correctness + speedup for a single operator
-kb_nano kernels --target rms_norm
-
-# Standardized end-to-end eval sweep
-kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
+<pre><code>fastkernels bench --target rms_norm
+fastkernels bench --standalone          # one module, production children
+fastkernels eval default                # 11-model MacroEval set</code></pre>
           <p style="text-align: center; margin-top: 1.2rem;">
-            <a href="https://snowflake-84d72a0d.mintlify.app/intro" class="external-link button is-normal is-rounded is-dark">
+            <a href="https://github.com/Snowflake-AI-Research/fastkernels/tree/main/docs" class="external-link button is-normal is-rounded is-dark">
               <span class="icon"><i class="fas fa-book"></i></span>
               <span>Full Documentation</span>
             </a>
@@ -783,8 +975,9 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
                 automated pipelines, evaluate on a single GPU with synthetic inputs, and compare against PyTorch eager. FastKernels
                 takes a <b>top-down</b> approach: it starts from real model families, walks the forward pass, and produces
                 standalone tasks whose interfaces match the corresponding modules in production libraries (vLLM, SGLang,
-                diffusers, FLA, timm). Speedups are measured against the kernels production systems actually ship&mdash;cuBLAS,
-                FlashAttention-3, FlashInfer, vLLM CUDA ops, DeepGEMM&mdash;not torch eager.
+                diffusers, FLA, timm). Speedups are measured against the kernels production systems actually ship.
+                Levels compose&mdash;higher-level modules import lower-level ones&mdash;and every candidate is also scored end to
+                end inside the model, on the production execution path.
               </p>
             </div>
           </details>
@@ -792,16 +985,15 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
           <details style="margin-bottom: 1.5rem; border: 1px solid var(--border-color); border-radius: 6px; padding: 1rem;">
             <summary style="cursor: pointer; font-weight: 600; font-size: 1.15rem; user-select: none;">
               <i class="fas fa-chevron-right" style="transition: transform 0.2s; margin-right: 0.5rem;"></i>
-              Why only 46 architectures? Doesn't that limit coverage?
+              Why 47 architectures?
             </summary>
             <div style="margin-top: 1rem; padding-left: 1.5rem;">
               <p>
-                FastKernels consolidates near-identical operators (e.g. RoPE variants, normalizations, attention backends) into a
+                FastKernels consolidates near-identical operators (RoPE variants, normalizations, attention backends) into a
                 single L1/L2 task and picks a small set of representative architectures whose union of operators subsumes the
-                long tail of model families. An audit of every PyTorch modeling file in HuggingFace Transformers (commit
-                <code>da6c53e4</code>; 425 entries) indicates that these 46 architectures cover <b>96.2% (409/425)</b> of HF
-                architectures with no new compute primitive&mdash;only 5 architectures require a genuinely new kernel and 2
-                require an external library.
+                long tail. Reimplementing every HuggingFace Transformers architecture (commit <code>89b6b17</code>) on FastKernels
+                without adding an operator shows that these kernels cover <b>94.6% (472/499)</b> of them, with outputs matching
+                the native implementations within dtype-dependent tolerances. Only 5 architectures require a genuinely new operation.
               </p>
             </div>
           </details>
@@ -813,12 +1005,10 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
             </summary>
             <div style="margin-top: 1rem; padding-left: 1.5rem;">
               <p>
-                Yes. Each task's <code>__init__</code> constructor signature and <code>forward</code> method are designed to
-                closely match the corresponding module in the state-of-the-art library for its architecture family. A kernel
-                optimized within FastKernels can be deployed into vLLM, SGLang, or another production framework essentially via a
-                copy-paste of the module, with no heavy interface refactoring. Unlike FlashInfer-Bench's FIApply (which substitutes
-                at the kernel dispatch level), FastKernels operates at the <b>module level</b>&mdash;the unit of composition that
-                production frameworks actually use.
+                Yes. Each task's <code>__init__</code> constructor signature and <code>forward</code> method match the corresponding
+                module in the production library for its family. A kernel optimized in FastKernels can be copied into vLLM, SGLang,
+                or another production framework without interface refactoring. Compatibility is at the <b>module</b> level, the unit
+                those frameworks compose, rather than at a kernel-dispatch hook internal to one library.
               </p>
             </div>
           </details>
@@ -830,13 +1020,12 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
             </summary>
             <div style="margin-top: 1rem; padding-left: 1.5rem;">
               <p>
-                Production inference at scale is almost always distributed, and the resulting collectives, synchronization
-                barriers, and communication&ndash;computation overlaps materially affect end-to-end latency. To our knowledge
-                FastKernels is the first kernel benchmark to include them as first-class tasks: tensor-parallel all-reduce /
-                reduce-scatter, expert-parallel all-to-all dispatch and combine for MoE routing (DeepSeek-V3, Mixtral), and overlap
-                kernels that must hide NCCL collectives behind computation. A kernel that achieves 1.5&times; on a single GPU can
-                still degrade end-to-end throughput if it disrupts the communication schedule&mdash;these tasks are unreachable
-                from single-GPU benchmarks.
+                FastKernels includes the communication path of its tensor-parallel models as tasks: a custom IPC all-reduce (L1);
+                the tensor-parallel linear, embedding, and MoE layers that issue it (L2); and a decoder layer that fuses it with
+                residual addition and RMSNorm (L3). The all-reduce and row-parallel linear are benched in a real NCCL group of the
+                capture's tensor-parallel degree, and these operators also run end to end inside models served at TP 2&ndash;8.
+                A kernel that is 1.5&times; faster on one GPU can still slow the model if it disrupts the schedule it shares with
+                the compute kernels.
               </p>
             </div>
           </details>
@@ -848,17 +1037,18 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
             </summary>
             <div style="margin-top: 1rem; padding-left: 1.5rem;">
               <p>
-                We evaluate three state-of-the-art agents on FastKernels L1 and L2 (88 target families):
+                The seed leaderboard evaluates five agents on the default set (47 L1, 64 L2, and 21 L3 targets, then the 11 models
+                end to end), about 6,900 agent-hours:
               </p>
               <ul>
-                <li><b>OpenAI Codex</b> &mdash; 0.943&times; geomean, 88/88 correct</li>
-                <li><b>KernelAgent</b> &mdash; 0.777&times; geomean, 28/76 correct</li>
-                <li><b>Dr. Kernel</b> &mdash; 0.527&times; geomean, 8/38 correct</li>
+                <li><b>KDA</b> and <b>AKO</b> &mdash; long-horizon harnesses behind winning MLSys 2026 FlashInfer contest entries</li>
+                <li><b>Claude Code</b> and <b>Codex</b> &mdash; the coding agents those harnesses build on</li>
+                <li><b>Dr.&nbsp;Kernel</b> &mdash; an RL-trained KernelBench-ecosystem model</li>
               </ul>
               <p>
-                All three land below 1&times; on aggregate, in contrast to the supra-unity numbers reported on operator-level
-                benchmarks whose reference is PyTorch eager. The per-target results pinpoint two design choices in FastKernels
-                that account for the gap: production-grade references and production-shaped composite modules at L2.
+                Four of them reach kernel-level geomeans of 1.6&ndash;6.6&times; over the production kernels. End to end, the best
+                deployable speedup is 1.25&times; (AKO, sequential), and KDA ranks first on MacroEval (score 1.11) because all 11
+                of its models stay valid. KernelAgent did not reproduce in this setting and is not on the leaderboard.
               </p>
             </div>
           </details>
@@ -874,8 +1064,9 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
                 architecture definition, walks the forward pass, and produces standalone task implementations for each kernel
                 with all configuration constants (hidden size, number of heads, data types) inlined from the model's
                 configuration. The pipeline ships as part of the framework, so users can add new architectures from HuggingFace
-                with minimal effort. See the <a href="https://snowflake-84d72a0d.mintlify.app/intro">documentation</a> for
-                details.
+                with minimal effort. See the
+                <a href="https://github.com/Snowflake-AI-Research/fastkernels/blob/main/docs/model-optimization-guide.md">model optimization guide</a>
+                for how a new architecture is imported from vLLM or SGLang.
               </p>
             </div>
           </details>
@@ -887,22 +1078,25 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
             </summary>
             <div style="margin-top: 1rem; padding-left: 1.5rem;">
               <p>
-                FastKernels exposes three tiers of increasing scope:
+                One evaluation stack, used either as a diagnostic or in leaderboard mode:
               </p>
               <ul>
-                <li><b>Tier 1 &mdash; Kernel:</b> instantiates a candidate operator next to the baseline, copies weights, and
-                compares <code>forward()</code> outputs and runtimes across an input registry of shapes, dtypes, and init
-                arguments. For data-dependent operators (e.g. MoE dispatch) it replays golden inputs captured from real
-                end-to-end executions.</li>
-                <li><b>Tier 2 &mdash; E2E:</b> end-to-end model benchmarks, measuring full-model throughput, latency, and
-                serving behavior under user-specified workloads.</li>
-                <li><b>Tier 3 &mdash; Eval:</b> standardized evaluation sweeps, comparing baseline and candidate executions
-                across fixed models, tensor-parallel configurations, and throughput&ndash;latency workloads. This is the
-                benchmark used for the leaderboard.</li>
+                <li><b>Scenario sets</b> fix a checkpoint, tensor-parallel degree, dtype, and workloads.
+                <code>full</code> is one scenario per architecture (47 scenarios, 184 workloads) and validates the baselines.
+                <code>default</code> is the 11-model subset agents are scored on.
+                <code>minimal</code> is a Llama-3.1-8B smoke test.</li>
+                <li><b>Capture</b> (<code>fastkernels capture</code>) runs each scenario and records a reconstructable constructor
+                recipe plus the shape, dtype, and stride of every <code>forward</code> argument. On the default B200 capture,
+                12.4M calls reduce to 582 benchmarked cases.</li>
+                <li><b>Kernel tier</b> (<code>fastkernels bench</code>) rebuilds each candidate next to its baseline, shares
+                weights, and compares outputs and runtimes. <code>--standalone</code> benches one module over production children;
+                composed mode activates every candidate file together. Data-dependent operators can replay captured golden inputs.</li>
+                <li><b>End-to-end tier</b> (<code>fastkernels eval</code>) swaps a candidate set into full model executions on the
+                production path, next to a baseline run and a noise run, and reports MacroEval. This is the leaderboard.</li>
               </ul>
               <p>
-                Profiling is first-class: Tier 1 integrates with NVIDIA Nsight Compute (NCU); Tier 2 with NVIDIA Nsight Systems
-                (NSYS). MLflow integration tracks kernel lineage and benchmark history.
+                Both tiers integrate with NVIDIA Nsight Compute (kernel-level) and Nsight Systems (end-to-end), and with MLflow
+                for kernel lineage across agent runs.
               </p>
             </div>
           </details>
@@ -920,8 +1114,9 @@ kb_nano eval --model meta-llama/Llama-3.1-8B-Instruct</code></pre>
   <div class="container is-max-desktop content">
     <h2 class="title">BibTeX</h2>
     <pre><code>@article{oliaro2026fastkernels,
-  author    = {Gabriele Oliaro and Yichao Fu and May Jiang and Owen Lu and
-               Junli Wang and Hao Zhang and Zhihao Jia and Samyam Rajbhandari},
+  author    = {Gabriele Oliaro and Jaeseong Lee and Yichao Fu and Zhaoyuan Su and
+               Owen Lu and Sreeram Vennam and May Jiang and Junli Wang and
+               Hao Zhang and Zhihao Jia and Samyam Rajbhandari},
   title     = {FastKernels: Benchmarking GPU Kernel Generation in Production},
   journal   = {arXiv preprint arXiv:2605.23215},
   year      = {2026},
